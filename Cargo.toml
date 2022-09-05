@@ -14,4 +14,4 @@ env_logger = { version = "*" }
 log = { version = "*" }
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
