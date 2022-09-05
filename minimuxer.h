@@ -14,4 +14,4 @@
  * # Safety
  * Don't be stupid
  */
-int minimuxer_c_start(char *pairing_file, unsigned int len);
+int minimuxer_c_start(char *pairing_file);

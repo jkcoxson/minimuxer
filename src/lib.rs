@@ -179,17 +179,14 @@ fn convert_ip(ip: IpAddr) -> [u8; 152] {
 /// Don't be stupid
 pub unsafe extern "C" fn minimuxer_c_start(
     pairing_file: *mut libc::c_char,
-    len: libc::c_uint,
 ) -> libc::c_int {
     if pairing_file.is_null() {
         return -1;
     }
 
-    let p_vec = Vec::from_raw_parts(pairing_file, len as usize, len as usize);
-    let p_vec = p_vec.into_iter().map(|x| x as u8).collect::<Vec<u8>>();
-    let p_cstr = std::ffi::CString::from_vec_unchecked(p_vec);
+    let c_str = std::ffi::CStr::from_ptr(pairing_file);
 
-    let pairing_file = match p_cstr.to_str() {
+    let pairing_file = match c_str.to_str() {
         Ok(s) => s,
         Err(_) => return -1,
     }
