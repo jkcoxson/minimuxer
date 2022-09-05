@@ -1,0 +1,17 @@
+[package]
+name = "minimuxer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rusty_libimobiledevice = { version = "0.1.4", features = ["dynamic"], path = "../rusty_libimobiledevice", default-features = false }
+plist_plus = { version = "0.2.*", features = ["dynamic"] }
+
+libc = { version = "0.2.132" }
+env_logger = { version = "*" }
+log = { version = "*" }
+
+[lib]
+crate-type = ["staticlib"]
