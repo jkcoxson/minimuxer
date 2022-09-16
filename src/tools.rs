@@ -211,3 +211,42 @@ pub fn yeet_app_afc(bundle_id: String, bytes: Vec<u8>) -> c_int {
         }
     }
 }
+
+pub fn install_ipa(bundle_id: String) -> c_int {
+    trace!("Getting device from muxer");
+    let device = match idevice::get_first_device() {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Unable to get device: {:?}", e);
+            return -1;
+        }
+    };
+
+    let mut client_opts = InstProxyClient::client_options_new();
+    client_opts
+        .dict_set_item("CFBundleIdentifier", bundle_id.clone().into())
+        .unwrap();
+
+    let inst_client = match device.new_instproxy_client("ideviceinstaller") {
+        Ok(i) => i,
+        Err(e) => {
+            error!("Unable to start instproxy: {:?}", e);
+            return -1;
+        }
+    };
+
+    trace!("Installing...");
+    match inst_client.install(
+        format!("./{}/{}/app.ipa", PKG_PATH, bundle_id),
+        Some(client_opts.clone()), // nobody understands libplist, but clone is necessary I guess
+    ) {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Unable to install app: {:?}", e);
+            return -1;
+        }
+    }
+
+    info!("Done!");
+    0
+}
