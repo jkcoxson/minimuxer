@@ -317,3 +317,32 @@ pub fn install_ipa(bundle_id: String) -> c_int {
     info!("Done!");
     0
 }
+
+#[no_mangle]
+/// Installs a provisioning profile on the device
+/// # Arguments
+/// Pass a pointer to a plist
+/// # Returns
+/// 0 on success
+/// # Safety
+/// Don't be stupid
+pub unsafe fn minimuxer_install_provisioning_profile(pointer: *mut std::os::raw::c_void) -> c_int {
+    let profile = Plist::from(pointer);
+    let device = idevice::get_first_device().unwrap();
+    let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
+        Ok(m) => m,
+        Err(_) => {
+            return -1;
+        }
+    };
+    match mis_client.install(profile) {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Unable to install provisioning profile: {:?}", e);
+            return -1;
+        }
+    }
+    println!("Minimuxer finished installing profile!!");
+
+    0
+}
