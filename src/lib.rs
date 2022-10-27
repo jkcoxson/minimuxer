@@ -103,7 +103,7 @@ fn handle_packet(packet: &RawPacket, pairing_file: Plist) -> Result<Plist, Plist
             properties_dict.dict_insert_item("InterfaceIndex", Plist::new_uint(69))?;
             properties_dict.dict_insert_item(
                 "NetworkAddress",
-                convert_ip(IpAddr::V4(Ipv4Addr::from_str("192.168.1.30").unwrap()))
+                convert_ip(IpAddr::V4(Ipv4Addr::from_str("10.7.0.1").unwrap()))
                     .to_vec()
                     .into(),
             )?;
