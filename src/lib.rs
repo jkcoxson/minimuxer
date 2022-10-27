@@ -211,6 +211,12 @@ pub unsafe extern "C" fn minimuxer_c_start(pairing_file: *mut libc::c_char) -> l
     0
 }
 
+#[no_mangle]
+/// Sets the current environment variable for libusbmuxd to localhost
+pub extern "C" fn target_minimuxer_address() {
+    std::env::set_var("USBMUXD_SOCKET_ADDRESS", "127.0.0.1:27015");
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{heartbeat::start_beat, listen};
