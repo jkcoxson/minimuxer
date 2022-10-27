@@ -11,6 +11,26 @@ use rusty_libimobiledevice::{
 
 const PKG_PATH: &str = "PublicStaging";
 
+#[no_mangle]
+/// Debugs an app from an app ID
+/// # Safety
+/// Don't be stupid
+pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> libc::c_int {
+    if app_id.is_null() {
+        return -1;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(app_id);
+
+    let app_id = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    }
+    .to_string();
+
+    enable_jit(app_id)
+}
+
 pub fn enable_jit(app_id: String) -> c_int {
     trace!("Getting device from muxer");
     let device = match idevice::get_first_device() {
@@ -133,6 +153,32 @@ pub fn enable_jit(app_id: String) -> c_int {
     0
 }
 
+#[no_mangle]
+/// Yeets an ipa to the afc jail
+/// # Safety
+/// Don't be stupid
+pub unsafe extern "C" fn minimuxer_yeet_app_afc(
+    bundle_id: *mut libc::c_char,
+    bytes_ptr: *mut u8,
+    bytes_len: libc::c_ulong,
+) -> libc::c_int {
+    if bundle_id.is_null() || bytes_ptr.is_null() {
+        return -1;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(bundle_id);
+
+    let bundle_id = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    }
+    .to_string();
+
+    let slc = std::slice::from_raw_parts(bytes_ptr, bytes_len as usize).to_vec();
+
+    yeet_app_afc(bundle_id, slc)
+}
+
 pub fn yeet_app_afc(bundle_id: String, bytes: Vec<u8>) -> c_int {
     trace!("Getting device from muxer");
     let device = match idevice::get_first_device() {
@@ -210,6 +256,27 @@ pub fn yeet_app_afc(bundle_id: String, bytes: Vec<u8>) -> c_int {
             -1
         }
     }
+}
+
+#[no_mangle]
+/// Installs an ipa with a bundle ID
+/// Expects the ipa to be in the afc jail from yeet_app_afc
+/// # Safety
+/// Don't be stupid
+pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> libc::c_int {
+    if bundle_id.is_null() {
+        return -1;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(bundle_id);
+
+    let bundle_id = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    }
+    .to_string();
+
+    install_ipa(bundle_id)
 }
 
 pub fn install_ipa(bundle_id: String) -> c_int {
