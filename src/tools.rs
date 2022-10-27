@@ -326,7 +326,9 @@ pub fn install_ipa(bundle_id: String) -> c_int {
 /// 0 on success
 /// # Safety
 /// Don't be stupid
-pub unsafe fn minimuxer_install_provisioning_profile(pointer: *mut std::os::raw::c_void) -> c_int {
+pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
+    pointer: *mut std::os::raw::c_void,
+) -> c_int {
     let profile = Plist::from(pointer);
     let device = idevice::get_first_device().unwrap();
     let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
