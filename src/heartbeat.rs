@@ -11,7 +11,14 @@ pub fn start_beat(udid: String) {
         let device = idevice::get_device(udid).unwrap();
 
         loop {
-            let hb = device.new_heartbeat_client("minimuxer").unwrap();
+            let hb = match device.new_heartbeat_client("minimuxer") {
+                Ok(h) => h,
+                Err(e) => {
+                    println!("Failed to create heartbeat client: {:?}", e);
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    continue;
+                }
+            };
 
             loop {
                 let plist = match hb.receive(12000) {
