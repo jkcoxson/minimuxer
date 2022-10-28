@@ -11,6 +11,8 @@ use rusty_libimobiledevice::{
 };
 
 const PKG_PATH: &str = "PublicStaging";
+const VERSIONS_DICTIONARY: &str =
+    "https://raw.githubusercontent.com/jkcoxson/JitStreamer/master/versions.json";
 
 #[no_mangle]
 /// Debugs an app from an app ID
@@ -422,13 +424,201 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_
 #[no_mangle]
 /// Mount iOS's developer DMG
 pub extern "C" fn minimuxer_auto_mount() {
-    for path in std::fs::read_dir(".").unwrap() {
-        println!("{:?}", path);
-    }
-
     // This will take a while, especially if the muxer is still waking up
     // Let's move to a new thread
     std::thread::spawn(|| {
-        // todo
+        // Create the DMG folder if it doesn't exist
+        std::fs::create_dir_all("./DMG").unwrap();
+
+        loop {
+            // Sleep in between failed attempts
+            std::thread::sleep(std::time::Duration::from_secs(5));
+
+            // Fetch the device
+            let device = match idevice::get_first_device() {
+                Ok(d) => d,
+                Err(e) => {
+                    println!("Failed to get device for image mounting: {:?}", e);
+                    continue;
+                }
+            };
+
+            // Start an image mounter service
+            let mim = match device.new_mobile_image_mounter("sidestore-image-reeeee") {
+                Ok(m) => m,
+                Err(e) => {
+                    println!("Unable to start mobile image mounter: {:?}", e);
+                    continue;
+                }
+            };
+
+            // Determine if the image is already mounted
+            let images = match mim.lookup_image("Developer") {
+                Ok(images) => images,
+                Err(e) => {
+                    println!("Error looking up developer images: {:?}", e);
+                    continue;
+                }
+            };
+            match images.dict_get_item("ImageSignature") {
+                Ok(a) => match a.array_get_size() {
+                    Ok(n) => {
+                        if n > 0 {
+                            println!("Developer disk image already mounted");
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        panic!("Could not get image array size!!");
+                    }
+                },
+                Err(_) => {
+                    panic!("Image plist in wrong format!!\n\nCannot read developer disk images!!")
+                }
+            }
+
+            let lockdown_client = match device.new_lockdownd_client("sidestore-lockdown-reeeee") {
+                Ok(l) => l,
+                Err(e) => {
+                    println!("Unable to create lockdown client: {:?}", e);
+                    continue;
+                }
+            };
+
+            let ios_version = match lockdown_client.get_value("ProductVersion", "") {
+                Ok(ios_version) => ios_version.get_string_val().unwrap(),
+                Err(e) => {
+                    println!("Error getting iOS version: {:?}", e);
+                    continue;
+                }
+            };
+
+            // Determine if we already have the DMG downloaded
+            let path = std::path::Path::new("./DMG").join(format!("{}.dmg", &ios_version));
+            let path = if path.exists() {
+                path.to_str().unwrap().to_string()
+            } else {
+                // Nuke the DMG folder to remove old images
+                std::fs::remove_dir_all("./DMG").unwrap();
+                std::fs::create_dir_all("./DMG").unwrap();
+
+                // Download versions.json from GitHub
+                println!("Downloading iOS dictionary...");
+                let response = match reqwest::blocking::get(VERSIONS_DICTIONARY) {
+                    Ok(response) => response,
+                    Err(_) => {
+                        println!("Error downloading DMG dictionary!!");
+                        continue;
+                    }
+                };
+                let contents = match response.text() {
+                    Ok(contents) => contents,
+                    Err(_) => {
+                        println!("Error getting text from DMG dictionary!!");
+                        return;
+                    }
+                };
+                // Parse versions.json
+                let versions: serde_json::Value = serde_json::from_str(&contents).unwrap();
+
+                // Get DMG url
+                let ios_dmg_url = versions
+                    .get(&ios_version)
+                    .map(|x| x.as_str().unwrap().to_string());
+
+                // Download DMG zip
+                println!("Downloading iOS {} DMG...", ios_version);
+                let resp = match reqwest::blocking::get(ios_dmg_url.unwrap()) {
+                    Ok(resp) => resp,
+                    Err(_) => {
+                        println!("Unable to download DMG");
+                        continue;
+                    }
+                };
+                let mut out = match std::fs::File::create("dmg.zip") {
+                    Ok(out) => out,
+                    Err(_) => {
+                        println!("Unable to create dmg.zip");
+                        return;
+                    }
+                };
+                let mut content = std::io::Cursor::new(match resp.bytes() {
+                    Ok(content) => content,
+                    Err(_) => {
+                        println!("Cannot read content of DMG download");
+                        continue;
+                    }
+                });
+                match std::io::copy(&mut content, &mut out) {
+                    Ok(_) => (),
+                    Err(_) => {
+                        println!("Cannot save DMG bytes");
+                        continue;
+                    }
+                };
+                // Create tmp path
+                let tmp_path = "DMG/tmp";
+                info!("tmp path {}", tmp_path);
+                std::fs::create_dir_all(&tmp_path).unwrap();
+                // Unzip zip
+                let mut dmg_zip =
+                    match zip::ZipArchive::new(std::fs::File::open("dmg.zip").unwrap()) {
+                        Ok(dmg_zip) => dmg_zip,
+                        Err(_) => {
+                            println!("Could not read zip file to memory");
+                            std::fs::remove_file("dmg.zip").unwrap();
+                            continue;
+                        }
+                    };
+                match dmg_zip.extract(&tmp_path) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        println!("Could not extract DMG");
+                        std::fs::remove_file("dmg.zip").unwrap();
+                        continue;
+                    }
+                }
+                // Remove zip
+                std::fs::remove_file("dmg.zip").unwrap();
+                // Get folder name in tmp
+                let mut dmg_path = std::path::PathBuf::new();
+                for entry in std::fs::read_dir(&tmp_path).unwrap() {
+                    let entry = entry.unwrap();
+                    if entry.path().is_dir() {
+                        if entry.path().to_str().unwrap().contains("__MACOSX") {
+                            continue;
+                        }
+                        dmg_path = entry.path();
+                    }
+                }
+                // Move DMG to JIT Shipper directory
+                let ios_dmg = dmg_path.join("DeveloperDiskImage.dmg");
+                std::fs::rename(ios_dmg, format!("DMG/{}.dmg", ios_version)).unwrap();
+                let ios_sig = dmg_path.join("DeveloperDiskImage.dmg.signature");
+                std::fs::rename(ios_sig, format!("DMG/{}.dmg.signature", ios_version)).unwrap();
+
+                // Remove tmp path
+                std::fs::remove_dir_all(tmp_path).unwrap();
+                println!(
+                    "Successfully downloaded and extracted iOS {} developer disk image",
+                    ios_version
+                );
+
+                // Return DMG path
+                format!("./DMG{}.dmg", &ios_version)
+            };
+
+            match mim.mount_image(&path, "Developer", format!("{}.signature", path)) {
+                Ok(_) => {
+                    println!("Successfully mounted the image");
+                    return;
+                }
+                Err(e) => {
+                    println!("Unable to mount the developer image: {:?}", e);
+                    continue;
+                }
+            }
+        }
+        println!("Auto image mounter has finished, have a great day!");
     });
 }
