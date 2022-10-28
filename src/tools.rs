@@ -382,3 +382,39 @@ pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
 
     0
 }
+
+#[no_mangle]
+/// Removes a provisioning profile
+/// # Safety
+/// Don't be stupid
+pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_char) -> c_int {
+    if id.is_null() {
+        return -1;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(id);
+
+    let id = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    }
+    .to_string();
+
+    let device = idevice::get_first_device().unwrap();
+    let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
+        Ok(m) => m,
+        Err(_) => {
+            return -1;
+        }
+    };
+    match mis_client.remove(id) {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Unable to remove provisioning profile: {:?}", e);
+            return -1;
+        }
+    }
+    println!("Minimuxer finished removing profile!!");
+
+    0
+}
