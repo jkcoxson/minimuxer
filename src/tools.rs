@@ -320,6 +320,34 @@ pub fn install_ipa(bundle_id: String) -> c_int {
 }
 
 #[no_mangle]
+/// Removes an app from the device
+/// # Safety
+/// Don't be stupid
+pub unsafe extern "C" fn minimuxer_remove_app(bundle_id: *mut libc::c_char) -> libc::c_int {
+    if bundle_id.is_null() {
+        return -1;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(bundle_id);
+
+    let bundle_id = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    }
+    .to_string();
+
+    let device = idevice::get_first_device().unwrap();
+    let instproxy_client = device.new_instproxy_client("minimuxer-remove-app").unwrap();
+    match instproxy_client.uninstall(bundle_id, None) {
+        Ok(_) => 0,
+        Err(e) => {
+            println!("Unable to uninstall app!! {:?}", e);
+            -1
+        }
+    }
+}
+
+#[no_mangle]
 /// Installs a provisioning profile on the device
 /// # Arguments
 /// Pass a pointer to a plist
