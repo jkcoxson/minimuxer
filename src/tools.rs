@@ -2,6 +2,7 @@
 
 use std::os::raw::c_int;
 
+use libc::c_uint;
 use log::{error, info, trace};
 use plist_plus::Plist;
 use rusty_libimobiledevice::{
@@ -327,9 +328,13 @@ pub fn install_ipa(bundle_id: String) -> c_int {
 /// # Safety
 /// Don't be stupid
 pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
-    pointer: *mut std::os::raw::c_void,
+    pointer: *mut u8,
+    len: c_uint,
 ) -> c_int {
-    let profile = Plist::from(pointer);
+    let len = len as usize;
+    let data = Vec::from_raw_parts(pointer, len, len);
+    let plist = Plist::new_data(&data);
+
     let device = idevice::get_first_device().unwrap();
     let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
         Ok(m) => m,
@@ -337,7 +342,7 @@ pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
             return -1;
         }
     };
-    match mis_client.install(profile) {
+    match mis_client.install(plist) {
         Ok(_) => {}
         Err(e) => {
             println!("Unable to install provisioning profile: {:?}", e);
