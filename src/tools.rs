@@ -418,3 +418,17 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_
 
     0
 }
+
+#[no_mangle]
+/// Mount iOS's developer DMG
+pub extern "C" fn minimuxer_auto_mount() {
+    for path in std::fs::read_dir(".").unwrap() {
+        println!("{:?}", path);
+    }
+
+    // This will take a while, especially if the muxer is still waking up
+    // Let's move to a new thread
+    std::thread::spawn(|| {
+        // todo
+    });
+}
