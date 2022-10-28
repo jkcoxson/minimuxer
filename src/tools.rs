@@ -334,6 +334,7 @@ pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
     let len = len as usize;
     let data = Vec::from_raw_parts(pointer, len, len);
     let plist = Plist::new_data(&data);
+    std::mem::forget(data);
 
     let device = idevice::get_first_device().unwrap();
     let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
