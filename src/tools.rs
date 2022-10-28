@@ -423,12 +423,26 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_
 
 #[no_mangle]
 /// Mount iOS's developer DMG
-pub extern "C" fn minimuxer_auto_mount() {
+/// # Safety
+/// Don't be stupid
+pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
+    let c_str = std::ffi::CStr::from_ptr(docs_path);
+
+    let docs_path = &c_str.to_str().unwrap()[7..];
+    let dmg_docs_path = format!("{}/DMG", docs_path);
+    println!("DP: {docs_path}");
+
     // This will take a while, especially if the muxer is still waking up
     // Let's move to a new thread
-    std::thread::spawn(|| {
+    std::thread::spawn(move || {
+        let paths = std::fs::read_dir(docs_path).unwrap();
+
+        for path in paths {
+            println!("Name: {}", path.unwrap().path().display())
+        }
+
         // Create the DMG folder if it doesn't exist
-        std::fs::create_dir_all("./DMG").unwrap();
+        std::fs::create_dir_all(&dmg_docs_path).unwrap();
 
         loop {
             // Sleep in between failed attempts
@@ -494,13 +508,13 @@ pub extern "C" fn minimuxer_auto_mount() {
             };
 
             // Determine if we already have the DMG downloaded
-            let path = std::path::Path::new("./DMG").join(format!("{}.dmg", &ios_version));
+            let path = std::path::Path::new(&dmg_docs_path).join(format!("{}.dmg", &ios_version));
             let path = if path.exists() {
                 path.to_str().unwrap().to_string()
             } else {
                 // Nuke the DMG folder to remove old images
-                std::fs::remove_dir_all("./DMG").unwrap();
-                std::fs::create_dir_all("./DMG").unwrap();
+                std::fs::remove_dir_all(&dmg_docs_path).unwrap();
+                std::fs::create_dir_all(&dmg_docs_path).unwrap();
 
                 // Download versions.json from GitHub
                 println!("Downloading iOS dictionary...");
@@ -535,7 +549,8 @@ pub extern "C" fn minimuxer_auto_mount() {
                         continue;
                     }
                 };
-                let mut out = match std::fs::File::create("dmg.zip") {
+                let zip_path = format!("{}/dmg.zip", dmg_docs_path);
+                let mut out = match std::fs::File::create(&zip_path) {
                     Ok(out) => out,
                     Err(_) => {
                         println!("Unable to create dmg.zip");
@@ -557,16 +572,16 @@ pub extern "C" fn minimuxer_auto_mount() {
                     }
                 };
                 // Create tmp path
-                let tmp_path = "DMG/tmp";
+                let tmp_path = format!("{}/tmp", dmg_docs_path);
                 info!("tmp path {}", tmp_path);
                 std::fs::create_dir_all(&tmp_path).unwrap();
                 // Unzip zip
                 let mut dmg_zip =
-                    match zip::ZipArchive::new(std::fs::File::open("dmg.zip").unwrap()) {
+                    match zip::ZipArchive::new(std::fs::File::open(&zip_path).unwrap()) {
                         Ok(dmg_zip) => dmg_zip,
                         Err(_) => {
                             println!("Could not read zip file to memory");
-                            std::fs::remove_file("dmg.zip").unwrap();
+                            std::fs::remove_file(&zip_path).unwrap();
                             continue;
                         }
                     };
@@ -574,12 +589,12 @@ pub extern "C" fn minimuxer_auto_mount() {
                     Ok(_) => {}
                     Err(_) => {
                         println!("Could not extract DMG");
-                        std::fs::remove_file("dmg.zip").unwrap();
+                        std::fs::remove_file(&zip_path).unwrap();
                         continue;
                     }
                 }
                 // Remove zip
-                std::fs::remove_file("dmg.zip").unwrap();
+                std::fs::remove_file(&zip_path).unwrap();
                 // Get folder name in tmp
                 let mut dmg_path = std::path::PathBuf::new();
                 for entry in std::fs::read_dir(&tmp_path).unwrap() {
@@ -593,9 +608,13 @@ pub extern "C" fn minimuxer_auto_mount() {
                 }
                 // Move DMG to JIT Shipper directory
                 let ios_dmg = dmg_path.join("DeveloperDiskImage.dmg");
-                std::fs::rename(ios_dmg, format!("DMG/{}.dmg", ios_version)).unwrap();
+                std::fs::rename(ios_dmg, format!("{}/{}.dmg", dmg_docs_path, ios_version)).unwrap();
                 let ios_sig = dmg_path.join("DeveloperDiskImage.dmg.signature");
-                std::fs::rename(ios_sig, format!("DMG/{}.dmg.signature", ios_version)).unwrap();
+                std::fs::rename(
+                    ios_sig,
+                    format!("{}/{}.dmg.signature", dmg_docs_path, ios_version),
+                )
+                .unwrap();
 
                 // Remove tmp path
                 std::fs::remove_dir_all(tmp_path).unwrap();
@@ -605,13 +624,13 @@ pub extern "C" fn minimuxer_auto_mount() {
                 );
 
                 // Return DMG path
-                format!("./DMG{}.dmg", &ios_version)
+                format!("{}/{}.dmg", dmg_docs_path, &ios_version)
             };
 
             match mim.mount_image(&path, "Developer", format!("{}.signature", path)) {
                 Ok(_) => {
                     println!("Successfully mounted the image");
-                    return;
+                    break;
                 }
                 Err(e) => {
                     println!("Unable to mount the developer image: {:?}", e);
