@@ -9,7 +9,14 @@ pub fn start_beat(udid: String) {
         println!("Starting heartbeat thread");
 
         loop {
-            let device = idevice::get_device(&udid).unwrap();
+            let device = match idevice::get_device(&udid) {
+                Ok(d) => d,
+                Err(_) => {
+                    println!("Could not get device from muxer for heartbeat");
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    continue;
+                }
+            };
             let hb = match device.new_heartbeat_client("minimuxer") {
                 Ok(h) => h,
                 Err(e) => {
