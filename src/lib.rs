@@ -18,20 +18,49 @@ pub mod tools;
 const LISTEN_PORT: u16 = 27015;
 
 pub fn listen(pairing_file: Plist) {
-    // Create the listener
-    let listener = TcpListener::bind(SocketAddrV4::new(
-        Ipv4Addr::from_str("127.0.0.1").unwrap(),
-        LISTEN_PORT,
-    ))
-    .unwrap();
-
     std::thread::spawn(move || {
+        // Create the listener
+        let mut listener = TcpListener::bind(SocketAddrV4::new(
+            Ipv4Addr::from_str("127.0.0.1").unwrap(),
+            LISTEN_PORT,
+        ))
+        .unwrap();
+        let mut retries = 0;
         loop {
             // Listen for requests
             let (mut stream, _) = match listener.accept() {
                 Ok(s) => s,
-                Err(_) => continue,
+                Err(_) => {
+                    retries += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+
+                    if retries < 50 {
+                        continue;
+                    } else {
+                        // Rebind
+                        println!("minimuxer is rebinding to the muxer socket!!");
+                        std::mem::drop(listener);
+                        loop {
+                            listener = match TcpListener::bind(SocketAddrV4::new(
+                                Ipv4Addr::from_str("127.0.0.1").unwrap(),
+                                LISTEN_PORT,
+                            )) {
+                                Ok(l) => l,
+                                Err(_) => {
+                                    std::thread::sleep(std::time::Duration::from_millis(50));
+                                    continue;
+                                }
+                            };
+                            break;
+                        }
+                        println!("minimuxer has bound successfully");
+                        retries = 0;
+
+                        continue;
+                    }
+                }
             };
+            retries = 0;
 
             // Read the packet
             let mut buf = [0u8; 0xfff];
