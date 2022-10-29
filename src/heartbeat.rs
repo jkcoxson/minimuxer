@@ -8,9 +8,8 @@ pub fn start_beat(udid: String) {
         std::thread::sleep(std::time::Duration::from_millis(50));
         println!("Starting heartbeat thread");
 
-        let device = idevice::get_device(udid).unwrap();
-
         loop {
+            let device = idevice::get_device(&udid).unwrap();
             let hb = match device.new_heartbeat_client("minimuxer") {
                 Ok(h) => h,
                 Err(e) => {
