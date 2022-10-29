@@ -15,7 +15,7 @@ pub fn start_beat(udid: String) {
                 Ok(h) => h,
                 Err(e) => {
                     println!("Failed to create heartbeat client: {:?}", e);
-                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    std::thread::sleep(std::time::Duration::from_millis(100));
                     continue;
                 }
             };
