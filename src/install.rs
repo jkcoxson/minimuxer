@@ -2,7 +2,7 @@
 
 use log::{error, info, trace};
 use rusty_libimobiledevice::{
-    idevice::{self, Device},
+    idevice::{self},
     services::{afc::AfcFileMode, instproxy::InstProxyClient},
 };
 
@@ -78,13 +78,11 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
                 Ok(_) => {}
                 Err(e) => {
                     error!("Unable to read bundle ID info: {:?}", e);
-                    cleanup(&device);
                     return Errors::RwAfc.into();
                 }
             },
             Err(e) => {
                 error!("Unable to make bundle ID directory: {:?}", e);
-                cleanup(&device);
                 return Errors::RwAfc.into();
             }
         },
@@ -99,7 +97,6 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
         Ok(h) => h,
         Err(e) => {
             println!("Unable to open file on device: {:?}", e);
-            cleanup(&device);
             return Errors::RwAfc.into();
         }
     };
@@ -109,7 +106,6 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
         Ok(_) => Errors::Success.into(),
         Err(e) => {
             println!("Unable to write ipa: {:?}", e);
-            cleanup(&device);
             Errors::RwAfc.into()
         }
     }
@@ -151,7 +147,6 @@ pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> 
         Ok(i) => i,
         Err(e) => {
             error!("Unable to start instproxy: {:?}", e);
-            cleanup(&device);
             return Errors::CreateInstproxy.into();
         }
     };
@@ -164,13 +159,11 @@ pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> 
         Ok(_) => {}
         Err(e) => {
             error!("Unable to install app: {:?}", e);
-            cleanup(&device);
             return Errors::InstallApp.into();
         }
     }
 
     info!("Done!");
-    cleanup(&device);
     Errors::Success.into()
 }
 
@@ -199,14 +192,5 @@ pub unsafe extern "C" fn minimuxer_remove_app(bundle_id: *mut libc::c_char) -> l
             println!("Unable to uninstall app!! {:?}", e);
             Errors::UninstallApp.into()
         }
-    }
-}
-
-/// Attempts to remove the PublicStaging directory
-fn cleanup(device: &Device) {
-    let afc_client = device.new_afc_client("minimuxer-cleanup").unwrap();
-    match afc_client.remove_path_and_contents(format!("./{}", PKG_PATH)) {
-        Ok(_) => println!("Finished cleaning the public staging directory"),
-        Err(e) => println!("Unable to clean the public staging directory: {:?}", e),
     }
 }
