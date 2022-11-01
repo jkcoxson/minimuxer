@@ -1,6 +1,7 @@
 // Jackson Coxson
 
 use libc::{c_int, c_uint};
+use log::{error, info};
 use plist_plus::Plist;
 use rusty_libimobiledevice::idevice;
 
@@ -40,11 +41,11 @@ pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
     match mis_client.install(plist) {
         Ok(_) => {}
         Err(e) => {
-            println!("Unable to install provisioning profile: {:?}", e);
+            error!("Unable to install provisioning profile: {:?}", e);
             return Errors::ProfileInstall.into();
         }
     }
-    println!("Minimuxer finished installing profile!!");
+    info!("Minimuxer finished installing profile!!");
 
     Errors::Success.into()
 }
@@ -83,11 +84,11 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_
     match mis_client.remove(id) {
         Ok(_) => {}
         Err(e) => {
-            println!("Unable to remove provisioning profile: {:?}", e);
+            error!("Unable to remove provisioning profile: {:?}", e);
             return Errors::ProfileRemove.into();
         }
     }
-    println!("Minimuxer finished removing profile!!");
+    info!("Minimuxer finished removing profile!!");
 
-    0
+    Errors::Success.into()
 }

@@ -1,6 +1,6 @@
 // Jackson Coxson
 
-use log::info;
+use log::{error, info};
 use rusty_libimobiledevice::idevice;
 
 const VERSIONS_DICTIONARY: &str =
@@ -15,17 +15,10 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
 
     let docs_path = &c_str.to_str().unwrap()[7..];
     let dmg_docs_path = format!("{}/DMG", docs_path);
-    println!("DP: {docs_path}");
 
     // This will take a while, especially if the muxer is still waking up
     // Let's move to a new thread
     std::thread::spawn(move || {
-        let paths = std::fs::read_dir(docs_path).unwrap();
-
-        for path in paths {
-            println!("Name: {}", path.unwrap().path().display())
-        }
-
         // Create the DMG folder if it doesn't exist
         std::fs::create_dir_all(&dmg_docs_path).unwrap();
 
@@ -37,7 +30,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
             let device = match idevice::get_first_device() {
                 Ok(d) => d,
                 Err(e) => {
-                    println!("Failed to get device for image mounting: {:?}", e);
+                    error!("Failed to get device for image mounting: {:?}", e);
                     continue;
                 }
             };
@@ -46,7 +39,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
             let mim = match device.new_mobile_image_mounter("sidestore-image-reeeee") {
                 Ok(m) => m,
                 Err(e) => {
-                    println!("Unable to start mobile image mounter: {:?}", e);
+                    error!("Unable to start mobile image mounter: {:?}", e);
                     continue;
                 }
             };
@@ -55,7 +48,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
             let images = match mim.lookup_image("Developer") {
                 Ok(images) => images,
                 Err(e) => {
-                    println!("Error looking up developer images: {:?}", e);
+                    error!("Error looking up developer images: {:?}", e);
                     continue;
                 }
             };
@@ -63,7 +56,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                 Ok(a) => match a.array_get_size() {
                     Ok(n) => {
                         if n > 0 {
-                            println!("Developer disk image already mounted");
+                            info!("Developer disk image already mounted");
                             break;
                         }
                     }
@@ -79,7 +72,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
             let lockdown_client = match device.new_lockdownd_client("sidestore-lockdown-reeeee") {
                 Ok(l) => l,
                 Err(e) => {
-                    println!("Unable to create lockdown client: {:?}", e);
+                    error!("Unable to create lockdown client: {:?}", e);
                     continue;
                 }
             };
@@ -87,7 +80,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
             let ios_version = match lockdown_client.get_value("ProductVersion", "") {
                 Ok(ios_version) => ios_version.get_string_val().unwrap(),
                 Err(e) => {
-                    println!("Error getting iOS version: {:?}", e);
+                    error!("Error getting iOS version: {:?}", e);
                     continue;
                 }
             };
@@ -102,18 +95,18 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                 std::fs::create_dir_all(&dmg_docs_path).unwrap();
 
                 // Download versions.json from GitHub
-                println!("Downloading iOS dictionary...");
+                info!("Downloading iOS dictionary...");
                 let response = match reqwest::blocking::get(VERSIONS_DICTIONARY) {
                     Ok(response) => response,
                     Err(_) => {
-                        println!("Error downloading DMG dictionary!!");
+                        error!("Error downloading DMG dictionary!!");
                         continue;
                     }
                 };
                 let contents = match response.text() {
                     Ok(contents) => contents,
                     Err(_) => {
-                        println!("Error getting text from DMG dictionary!!");
+                        error!("Error getting text from DMG dictionary!!");
                         return;
                     }
                 };
@@ -126,11 +119,11 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                     .map(|x| x.as_str().unwrap().to_string());
 
                 // Download DMG zip
-                println!("Downloading iOS {} DMG...", ios_version);
+                info!("Downloading iOS {} DMG...", ios_version);
                 let resp = match reqwest::blocking::get(ios_dmg_url.unwrap()) {
                     Ok(resp) => resp,
                     Err(_) => {
-                        println!("Unable to download DMG");
+                        error!("Unable to download DMG");
                         continue;
                     }
                 };
@@ -138,21 +131,21 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                 let mut out = match std::fs::File::create(&zip_path) {
                     Ok(out) => out,
                     Err(_) => {
-                        println!("Unable to create dmg.zip");
+                        error!("Unable to create dmg.zip");
                         return;
                     }
                 };
                 let mut content = std::io::Cursor::new(match resp.bytes() {
                     Ok(content) => content,
                     Err(_) => {
-                        println!("Cannot read content of DMG download");
+                        error!("Cannot read content of DMG download");
                         continue;
                     }
                 });
                 match std::io::copy(&mut content, &mut out) {
                     Ok(_) => (),
                     Err(_) => {
-                        println!("Cannot save DMG bytes");
+                        error!("Cannot save DMG bytes");
                         continue;
                     }
                 };
@@ -165,7 +158,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                     match zip::ZipArchive::new(std::fs::File::open(&zip_path).unwrap()) {
                         Ok(dmg_zip) => dmg_zip,
                         Err(_) => {
-                            println!("Could not read zip file to memory");
+                            error!("Could not read zip file to memory");
                             std::fs::remove_file(&zip_path).unwrap();
                             continue;
                         }
@@ -173,7 +166,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                 match dmg_zip.extract(&tmp_path) {
                     Ok(_) => {}
                     Err(_) => {
-                        println!("Could not extract DMG");
+                        error!("Could not extract DMG");
                         std::fs::remove_file(&zip_path).unwrap();
                         continue;
                     }
@@ -203,7 +196,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
 
                 // Remove tmp path
                 std::fs::remove_dir_all(tmp_path).unwrap();
-                println!(
+                info!(
                     "Successfully downloaded and extracted iOS {} developer disk image",
                     ios_version
                 );
@@ -214,15 +207,15 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
 
             match mim.mount_image(&path, "Developer", format!("{}.signature", path)) {
                 Ok(_) => {
-                    println!("Successfully mounted the image");
+                    info!("Successfully mounted the image");
                     break;
                 }
                 Err(e) => {
-                    println!("Unable to mount the developer image: {:?}", e);
+                    info!("Unable to mount the developer image: {:?}", e);
                     continue;
                 }
             }
         }
-        println!("Auto image mounter has finished, have a great day!");
+        info!("Auto image mounter has finished, have a great day!");
     });
 }

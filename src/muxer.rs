@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use log::{info, LevelFilter};
+use log::{info, warn, LevelFilter};
 use plist_plus::{error::PlistError, Plist};
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode, WriteLogger};
 
@@ -36,7 +36,7 @@ pub fn listen(pairing_file: Plist) {
                         continue;
                     } else {
                         // Rebind
-                        println!("minimuxer is rebinding to the muxer socket!!");
+                        warn!("minimuxer is rebinding to the muxer socket!!");
                         std::mem::drop(listener);
                         loop {
                             listener = match TcpListener::bind(SocketAddrV4::new(
@@ -51,7 +51,7 @@ pub fn listen(pairing_file: Plist) {
                             };
                             break;
                         }
-                        println!("minimuxer has bound successfully");
+                        info!("minimuxer has bound successfully");
                         retries = 0;
 
                         continue;
@@ -111,7 +111,6 @@ fn handle_packet(packet: &RawPacket, pairing_file: Plist) -> Result<Plist, Plist
         .as_str()
     {
         "ListDevices" => {
-            println!("ListDevices");
             // Get the device UDID from the pairing file
             let udid = pairing_file.dict_get_item("UDID")?.get_string_val()?;
 
@@ -242,7 +241,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
             ColorChoice::Auto,
         ),
         WriteLogger::new(
-            LevelFilter::Trace,
+            LevelFilter::Info,
             Config::default(),
             File::create(&log_path).unwrap(),
         ),

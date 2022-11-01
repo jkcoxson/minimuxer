@@ -104,7 +104,7 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
     info!("Bundle Path: {}", bundle_path);
 
     match debug_server.send_command("QSetMaxPacketSize: 1024".into()) {
-        Ok(res) => println!("Successfully set max packet size: {:?}", res),
+        Ok(res) => info!("Successfully set max packet size: {:?}", res),
         Err(e) => {
             error!("Error setting max packet size: {:?}", e);
             return Errors::MaxPacket.into();
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
     }
 
     match debug_server.send_command(format!("QSetWorkingDir: {}", working_directory).into()) {
-        Ok(res) => println!("Successfully set working directory: {:?}", res),
+        Ok(res) => info!("Successfully set working directory: {:?}", res),
         Err(e) => {
             error!("Error setting working directory: {:?}", e);
             return Errors::WorkingDirectory.into();
@@ -120,7 +120,7 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
     }
 
     match debug_server.set_argv(vec![bundle_path.clone(), bundle_path]) {
-        Ok(res) => println!("Successfully set argv: {:?}", res),
+        Ok(res) => info!("Successfully set argv: {:?}", res),
         Err(e) => {
             error!("Error setting argv: {:?}", e);
             return Errors::Argv.into();
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
     }
 
     match debug_server.send_command("qLaunchSuccess".into()) {
-        Ok(res) => println!("Got launch response: {:?}", res),
+        Ok(res) => info!("Got launch response: {:?}", res),
         Err(e) => {
             error!("Error checking if app launched: {:?}", e);
             return Errors::LaunchSuccess.into();
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
     match debug_server.send_command("D".into()) {
         Ok(res) => info!("Detaching: {:?}", res),
         Err(e) => {
-            println!("Error detaching: {:?}", e);
+            error!("Error detaching: {:?}", e);
             return Errors::Detach.into();
         }
     }

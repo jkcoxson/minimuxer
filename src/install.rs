@@ -100,16 +100,16 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
     ) {
         Ok(h) => h,
         Err(e) => {
-            println!("Unable to open file on device: {:?}", e);
+            error!("Unable to open file on device: {:?}", e);
             return Errors::RwAfc.into();
         }
     };
 
-    println!("Sending bytes of ipa");
+    info!("Sending bytes of ipa");
     match afc.file_write(handle, slc) {
         Ok(_) => Errors::Success.into(),
         Err(e) => {
-            println!("Unable to write ipa: {:?}", e);
+            error!("Unable to write ipa: {:?}", e);
             Errors::RwAfc.into()
         }
     }
@@ -204,7 +204,7 @@ pub unsafe extern "C" fn minimuxer_remove_app(bundle_id: *mut libc::c_char) -> l
     match instproxy_client.uninstall(bundle_id, None) {
         Ok(_) => Errors::Success.into(),
         Err(e) => {
-            println!("Unable to uninstall app!! {:?}", e);
+            error!("Unable to uninstall app!! {:?}", e);
             Errors::UninstallApp.into()
         }
     }
