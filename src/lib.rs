@@ -60,8 +60,6 @@ mod tests {
 
     #[test]
     fn run() {
-        env_logger::init();
-
         let p_file = Plist::from_xml(
             include_str!("../../../Documents/PairingFiles/00008101-001E30590C08001E.plist")
                 .to_string(),

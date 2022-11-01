@@ -1,12 +1,15 @@
 // Jackson Coxson
 
 use std::{
+    fs::File,
     io::{Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddrV4, TcpListener},
     str::FromStr,
 };
 
+use log::{info, LevelFilter};
 use plist_plus::{error::PlistError, Plist};
+use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode, WriteLogger};
 
 use crate::{errors::Errors, heartbeat::start_beat, raw_packet::RawPacket};
 
@@ -202,8 +205,11 @@ fn convert_ip(ip: IpAddr) -> [u8; 152] {
 /// Pairing file as a list of chars and the length
 /// # Safety
 /// Don't be stupid
-pub unsafe extern "C" fn minimuxer_c_start(pairing_file: *mut libc::c_char) -> libc::c_int {
-    if pairing_file.is_null() {
+pub unsafe extern "C" fn minimuxer_c_start(
+    pairing_file: *mut libc::c_char,
+    log_path: *mut libc::c_char,
+) -> libc::c_int {
+    if pairing_file.is_null() || log_path.is_null() {
         return Errors::FunctionArgs.into();
     }
 
@@ -219,6 +225,31 @@ pub unsafe extern "C" fn minimuxer_c_start(pairing_file: *mut libc::c_char) -> l
         Ok(p) => p,
         Err(_) => return Errors::FunctionArgs.into(),
     };
+
+    let c_str = std::ffi::CStr::from_ptr(log_path);
+    let log_path = match c_str.to_str() {
+        Ok(l) => format!("{}/minimuxer.log", l),
+        Err(_) => return Errors::FunctionArgs.into(),
+    };
+
+    if std::fs::remove_file(&log_path).is_ok() {}
+
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Trace,
+            Config::default(),
+            File::create(&log_path).unwrap(),
+        ),
+    ])
+    .unwrap();
+
+    info!("Logger initialized!!");
 
     #[allow(clippy::redundant_clone)]
     let udid = match pairing_file.clone().dict_get_item("UDID") {
