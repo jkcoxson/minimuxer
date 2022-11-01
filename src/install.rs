@@ -6,7 +6,7 @@ use rusty_libimobiledevice::{
     services::{afc::AfcFileMode, instproxy::InstProxyClient},
 };
 
-use crate::{errors::Errors, fetch_first_device};
+use crate::{errors::Errors, fetch_first_device, test_device_connection};
 
 const PKG_PATH: &str = "PublicStaging";
 
@@ -32,6 +32,10 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
     .to_string();
 
     let slc = std::slice::from_raw_parts(bytes_ptr, bytes_len as usize).to_vec();
+
+    if !test_device_connection() {
+        return Errors::NoConnection.into();
+    }
 
     trace!("Getting device from muxer");
     let device = match fetch_first_device(Some(5000)) {
@@ -129,6 +133,10 @@ pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> 
     }
     .to_string();
 
+    if !test_device_connection() {
+        return Errors::NoConnection.into();
+    }
+
     trace!("Getting device from muxer");
     let device = match fetch_first_device(Some(5000)) {
         Ok(d) => d,
@@ -184,7 +192,14 @@ pub unsafe extern "C" fn minimuxer_remove_app(bundle_id: *mut libc::c_char) -> l
     }
     .to_string();
 
-    let device = idevice::get_first_device().unwrap();
+    if !test_device_connection() {
+        return Errors::NoConnection.into();
+    }
+
+    let device = match idevice::get_first_device() {
+        Ok(d) => d,
+        Err(_) => return Errors::NoDevice.into(),
+    };
     let instproxy_client = device.new_instproxy_client("minimuxer-remove-app").unwrap();
     match instproxy_client.uninstall(bundle_id, None) {
         Ok(_) => Errors::Success.into(),

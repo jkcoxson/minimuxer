@@ -5,7 +5,7 @@ use log::{error, info, trace};
 use plist_plus::Plist;
 use rusty_libimobiledevice::services::instproxy::InstProxyClient;
 
-use crate::{errors::Errors, fetch_first_device};
+use crate::{errors::Errors, fetch_first_device, test_device_connection};
 
 #[no_mangle]
 /// Debugs an app from an app ID
@@ -23,6 +23,10 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
         Err(_) => return Errors::FunctionArgs.into(),
     }
     .to_string();
+
+    if !test_device_connection() {
+        return Errors::NoConnection.into();
+    }
 
     trace!("Getting device from muxer");
     let device = match fetch_first_device(Some(5000)) {

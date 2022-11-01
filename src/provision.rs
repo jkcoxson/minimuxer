@@ -4,7 +4,7 @@ use libc::{c_int, c_uint};
 use plist_plus::Plist;
 use rusty_libimobiledevice::idevice;
 
-use crate::{errors::Errors, fetch_first_device};
+use crate::{errors::Errors, fetch_first_device, test_device_connection};
 
 #[no_mangle]
 /// Installs a provisioning profile on the device
@@ -22,6 +22,10 @@ pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
     let data = Vec::from_raw_parts(pointer, len, len);
     let plist = Plist::new_data(&data);
     std::mem::forget(data);
+
+    if !test_device_connection() {
+        return Errors::NoConnection.into();
+    }
 
     let device = match fetch_first_device(Some(5000)) {
         Ok(d) => d,
@@ -62,7 +66,14 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_
     }
     .to_string();
 
-    let device = idevice::get_first_device().unwrap();
+    if !test_device_connection() {
+        return Errors::NoConnection.into();
+    }
+
+    let device = match idevice::get_first_device() {
+        Ok(d) => d,
+        Err(_) => return Errors::NoDevice.into(),
+    };
     let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
         Ok(m) => m,
         Err(_) => {

@@ -23,6 +23,7 @@ pub enum Errors {
     CreateMisagent,
     ProfileInstall,
     ProfileRemove,
+    NoConnection,
 }
 
 impl From<Errors> for u32 {
@@ -48,6 +49,7 @@ impl From<Errors> for u32 {
             Errors::CreateMisagent => 17,
             Errors::ProfileInstall => 18,
             Errors::ProfileRemove => 19,
+            Errors::NoConnection => 20,
         }
     }
 }
