@@ -212,13 +212,23 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                     format!("{}/{}.dmg", dmg_docs_path, &ios_version)
                 };
 
+                match mim.upload_image(&path, "Developer", format!("{}.signature", path)) {
+                    Ok(_) => {
+                        info!("Successfully uploaded the image");
+                    }
+                    Err(e) => {
+                        error!("Unable to upload the developer disk image: {:?}", e);
+                        continue;
+                    }
+                }
+
                 match mim.mount_image(&path, "Developer", format!("{}.signature", path)) {
                     Ok(_) => {
                         info!("Successfully mounted the image");
                         break;
                     }
                     Err(e) => {
-                        info!("Unable to mount the developer image: {:?}", e);
+                        error!("Unable to mount the developer image: {:?}", e);
                         continue;
                     }
                 }
