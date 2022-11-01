@@ -228,7 +228,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     let c_str = std::ffi::CStr::from_ptr(log_path);
     let log_path = match c_str.to_str() {
-        Ok(l) => format!("{}/minimuxer.log", l),
+        Ok(l) => format!("{}/minimuxer.log", &l[7..]),
         Err(_) => return Errors::FunctionArgs.into(),
     };
 
