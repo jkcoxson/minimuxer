@@ -9,7 +9,9 @@ use std::{
 
 use log::{info, warn, LevelFilter};
 use plist_plus::{error::PlistError, Plist};
-use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode, WriteLogger};
+use simplelog::{
+    ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
+};
 
 use crate::{errors::Errors, heartbeat::start_beat, raw_packet::RawPacket};
 
@@ -236,18 +238,19 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     if std::fs::remove_file(&log_path).is_ok() {}
 
+    let config = ConfigBuilder::new()
+        .add_filter_allow("minimuxer".to_string())
+        .build();
+    let cfg2 = config.clone();
+
     CombinedLogger::init(vec![
         TermLogger::new(
             LevelFilter::Info,
-            Config::default(),
+            config,
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
-        WriteLogger::new(
-            LevelFilter::Info,
-            Config::default(),
-            File::create(&log_path).unwrap(),
-        ),
+        WriteLogger::new(LevelFilter::Info, cfg2, File::create(&log_path).unwrap()),
     ])
     .unwrap();
 
