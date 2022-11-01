@@ -16,90 +16,93 @@ use crate::{errors::Errors, heartbeat::start_beat, raw_packet::RawPacket};
 const LISTEN_PORT: u16 = 27015;
 
 pub fn listen(pairing_file: Plist) {
-    std::thread::spawn(move || {
-        // Create the listener
-        let mut listener = TcpListener::bind(SocketAddrV4::new(
-            Ipv4Addr::from_str("127.0.0.1").unwrap(),
-            LISTEN_PORT,
-        ))
-        .unwrap();
-        let mut retries = 0;
-        loop {
-            // Listen for requests
-            let (mut stream, _) = match listener.accept() {
-                Ok(s) => s,
-                Err(_) => {
-                    retries += 1;
-                    std::thread::sleep(std::time::Duration::from_millis(5));
+    std::thread::Builder::new()
+        .name("muxer".to_string())
+        .spawn(move || {
+            // Create the listener
+            let mut listener = TcpListener::bind(SocketAddrV4::new(
+                Ipv4Addr::from_str("127.0.0.1").unwrap(),
+                LISTEN_PORT,
+            ))
+            .unwrap();
+            let mut retries = 0;
+            loop {
+                // Listen for requests
+                let (mut stream, _) = match listener.accept() {
+                    Ok(s) => s,
+                    Err(_) => {
+                        retries += 1;
+                        std::thread::sleep(std::time::Duration::from_millis(5));
 
-                    if retries < 50 {
-                        continue;
-                    } else {
-                        // Rebind
-                        warn!("minimuxer is rebinding to the muxer socket!!");
-                        std::mem::drop(listener);
-                        loop {
-                            listener = match TcpListener::bind(SocketAddrV4::new(
-                                Ipv4Addr::from_str("127.0.0.1").unwrap(),
-                                LISTEN_PORT,
-                            )) {
-                                Ok(l) => l,
-                                Err(_) => {
-                                    std::thread::sleep(std::time::Duration::from_millis(50));
-                                    continue;
-                                }
-                            };
-                            break;
+                        if retries < 50 {
+                            continue;
+                        } else {
+                            // Rebind
+                            warn!("minimuxer is rebinding to the muxer socket!!");
+                            std::mem::drop(listener);
+                            loop {
+                                listener = match TcpListener::bind(SocketAddrV4::new(
+                                    Ipv4Addr::from_str("127.0.0.1").unwrap(),
+                                    LISTEN_PORT,
+                                )) {
+                                    Ok(l) => l,
+                                    Err(_) => {
+                                        std::thread::sleep(std::time::Duration::from_millis(50));
+                                        continue;
+                                    }
+                                };
+                                break;
+                            }
+                            info!("minimuxer has bound successfully");
+                            retries = 0;
+
+                            continue;
                         }
-                        info!("minimuxer has bound successfully");
-                        retries = 0;
-
-                        continue;
                     }
-                }
-            };
-            retries = 0;
+                };
+                retries = 0;
 
-            // Read the packet
-            let mut buf = [0u8; 0xfff];
-            let mut size = match stream.read(&mut buf) {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-
-            // Detect if only header was sent
-            if size == 16 {
-                let mut buf2 = [0u8; 0xfff];
-                let new_size = match stream.read(&mut buf2) {
+                // Read the packet
+                let mut buf = [0u8; 0xfff];
+                let mut size = match stream.read(&mut buf) {
                     Ok(s) => s,
                     Err(_) => continue,
                 };
-                let mut i = size;
-                for o in buf2 {
-                    if i == buf.len() - 1 {
-                        continue;
+
+                // Detect if only header was sent
+                if size == 16 {
+                    let mut buf2 = [0u8; 0xfff];
+                    let new_size = match stream.read(&mut buf2) {
+                        Ok(s) => s,
+                        Err(_) => continue,
+                    };
+                    let mut i = size;
+                    for o in buf2 {
+                        if i == buf.len() - 1 {
+                            continue;
+                        }
+                        buf[i] = o;
+                        i += 1;
                     }
-                    buf[i] = o;
-                    i += 1;
+                    size += new_size;
                 }
-                size += new_size;
+
+                let packet: RawPacket = buf[..size].try_into().unwrap();
+
+                // Handle the request
+                let response = match handle_packet(&packet, pairing_file.clone()) {
+                    Ok(res) => res,
+                    Err(_) => continue,
+                };
+
+                let to_return: Vec<u8> = RawPacket::new(response, 1, 8, packet.tag).into();
+                match stream.write_all(&to_return) {
+                    Ok(_) => (),
+                    Err(_) => continue,
+                }
             }
-
-            let packet: RawPacket = buf[..size].try_into().unwrap();
-
-            // Handle the request
-            let response = match handle_packet(&packet, pairing_file.clone()) {
-                Ok(res) => res,
-                Err(_) => continue,
-            };
-
-            let to_return: Vec<u8> = RawPacket::new(response, 1, 8, packet.tag).into();
-            match stream.write_all(&to_return) {
-                Ok(_) => (),
-                Err(_) => continue,
-            }
-        }
-    });
+        })
+        .unwrap();
 }
 
 fn handle_packet(packet: &RawPacket, pairing_file: Plist) -> Result<Plist, PlistError> {
