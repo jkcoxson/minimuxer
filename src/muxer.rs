@@ -214,6 +214,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
     log_path: *mut libc::c_char,
 ) -> libc::c_int {
     if pairing_file.is_null() || log_path.is_null() {
+        println!("\n\nPairing file or log path is null!! Everything is broken!!\n\n");
         return Errors::FunctionArgs.into();
     }
 
@@ -221,19 +222,28 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     let pairing_file = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(_) => {
+            println!("\n\nFailed to convert pairing file to string!!\n\n");
+            return Errors::FunctionArgs.into();
+        }
     }
     .to_string();
 
     let pairing_file = match Plist::from_xml(pairing_file) {
         Ok(p) => p,
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(_) => {
+            println!("\n\nFailed to convert pairing file to plist!!\n\n");
+            return Errors::FunctionArgs.into();
+        }
     };
 
     let c_str = std::ffi::CStr::from_ptr(log_path);
     let log_path = match c_str.to_str() {
         Ok(l) => format!("{}/minimuxer.log", &l[7..]),
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(_) => {
+            println!("\n\nFailed to convert log path to string!!\n\n");
+            return Errors::FunctionArgs.into();
+        }
     };
 
     if std::fs::remove_file(&log_path).is_ok() {}
@@ -252,7 +262,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
         ),
         WriteLogger::new(LevelFilter::Info, cfg2, File::create(&log_path).unwrap()),
     ])
-    .unwrap();
+    .expect("\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!!\n\n");
 
     info!("Logger initialized!!");
 
