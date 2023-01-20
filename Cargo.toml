@@ -10,7 +10,7 @@ rusty_libimobiledevice = { version = "0.1.6", features = ["dynamic"], default-fe
 plist_plus = { version = "0.2.*", features = ["dynamic"] }
 
 libc = { version = "0.2.132" }
-simplelog = { version = "*" }
+simplelog = { version = "0.12" }
 log = { version = "*" }
 
 reqwest = { version = "0.11.12", features = ["blocking"] }
