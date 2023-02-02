@@ -5,6 +5,7 @@ use std::{
     io::{Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddrV4, TcpListener},
     str::FromStr,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use log::{info, warn, LevelFilter};
@@ -213,6 +214,13 @@ pub unsafe extern "C" fn minimuxer_c_start(
     pairing_file: *mut libc::c_char,
     log_path: *mut libc::c_char,
 ) -> libc::c_int {
+    static STARTED: AtomicBool = AtomicBool::new(false);
+
+    if STARTED.load(Ordering::Relaxed) {
+        info!("Already started minimuxer, skipping");
+        return 0;
+    }
+
     if pairing_file.is_null() || log_path.is_null() {
         println!("\n\nPairing file or log path is null!! Everything is broken!!\n\n");
         return Errors::FunctionArgs.into();
@@ -248,21 +256,31 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     if std::fs::remove_file(&log_path).is_ok() {}
 
-    let config = ConfigBuilder::new()
-        .add_filter_allow("minimuxer".to_string())
-        .build();
-    let cfg2 = config.clone();
-
-    CombinedLogger::init(vec![
+    match CombinedLogger::init(vec![
         TermLogger::new(
-            LevelFilter::Info,
-            config,
+            // Allow debug logging for terminal only
+            LevelFilter::max(),
+            // Allow logging from everywhere, to include rusty_libimobiledevice and any other useful debugging info
+            ConfigBuilder::new()
+                .add_filter_ignore_str("plist_plus") // plist_plus spams logs
+                .build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
-        WriteLogger::new(LevelFilter::Info, cfg2, File::create(&log_path).unwrap()),
-    ])
-    .expect("\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!!\n\n");
+        WriteLogger::new(
+            LevelFilter::Info,
+            ConfigBuilder::new()
+                .add_filter_allow("minimuxer".to_string())
+                .build(),
+            File::create(&log_path).unwrap(),
+        ),
+    ]) {
+        Ok(_) => {}
+        Err(e) => println!(
+            "\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!! Error: {}\n\n",
+            e
+        ),
+    }
 
     info!("Logger initialized!!");
 
@@ -277,6 +295,8 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     listen(pairing_file);
     start_beat(udid);
+
+    STARTED.store(true, Ordering::Relaxed);
 
     0
 }
