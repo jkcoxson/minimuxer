@@ -49,7 +49,7 @@ macro_rules! make_test {
 
 fn to_c_char(input: &str) -> *mut c_char {
     let c_str = CString::new(input).unwrap();
-    c_str.into_raw() // FIXME: this should cause a memory leak but I had issues with as_ptr() not giving the correct args
+    c_str.into_raw() // this shouldn't cause a memory leak because minimuxer functions will take ownership
 }
 
 fn list_profiles() -> String {
