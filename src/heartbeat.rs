@@ -2,6 +2,9 @@
 
 use log::{error, info, warn};
 use rusty_libimobiledevice::idevice;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+pub static LAST_BEAT_SUCCESSFUL: AtomicBool = AtomicBool::new(false);
 
 pub fn start_beat(udid: String) {
     std::thread::Builder::new()
@@ -15,6 +18,7 @@ pub fn start_beat(udid: String) {
                 let device = match idevice::get_device(&udid) {
                     Ok(d) => d,
                     Err(_) => {
+                        LAST_BEAT_SUCCESSFUL.store(false, Ordering::Relaxed);
                         warn!("Could not get device from muxer for heartbeat");
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         continue;
@@ -23,6 +27,7 @@ pub fn start_beat(udid: String) {
                 let hb = match device.new_heartbeat_client("minimuxer") {
                     Ok(h) => h,
                     Err(e) => {
+                        LAST_BEAT_SUCCESSFUL.store(false, Ordering::Relaxed);
                         error!("Failed to create heartbeat client: {:?}", e);
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         continue;
@@ -33,6 +38,7 @@ pub fn start_beat(udid: String) {
                     let plist = match hb.receive(12000) {
                         Ok(p) => p,
                         Err(e) => {
+                            LAST_BEAT_SUCCESSFUL.store(false, Ordering::Relaxed);
                             error!("Heartbeat recv failed: {:?}", e);
                             break;
                         }
@@ -41,11 +47,13 @@ pub fn start_beat(udid: String) {
                     match hb.send(plist) {
                         Ok(_) => {}
                         Err(e) => {
+                            LAST_BEAT_SUCCESSFUL.store(false, Ordering::Relaxed);
                             error!("Heartbeat send failed: {:?}", e);
                             break;
                         }
                     }
 
+                    LAST_BEAT_SUCCESSFUL.store(true, Ordering::Relaxed);
                     info!("Heartbeat success!");
                 }
             }

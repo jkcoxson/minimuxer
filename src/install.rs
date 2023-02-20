@@ -56,10 +56,10 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
     };
 
     // Check if PublicStaging exists
-    match afc.get_file_info(format!("./{}", PKG_PATH)) {
+    match afc.get_file_info(format!("./{PKG_PATH}")) {
         Ok(_) => {}
-        Err(_) => match afc.make_directory(format!("./{}", PKG_PATH)) {
-            Ok(_) => match afc.get_file_info(format!("./{}", PKG_PATH)) {
+        Err(_) => match afc.make_directory(format!("./{PKG_PATH}")) {
+            Ok(_) => match afc.get_file_info(format!("./{PKG_PATH}")) {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Unable to read PublicStaging info: {:?}", e);
@@ -75,10 +75,10 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
     info!("Created PublicStaging directory");
 
     // Create bundle ID folder
-    match afc.get_file_info(format!("./{}/{}", PKG_PATH, bundle_id)) {
+    match afc.get_file_info(format!("./{PKG_PATH}/{bundle_id}")) {
         Ok(_) => {}
-        Err(_) => match afc.make_directory(format!("./{}/{}", PKG_PATH, bundle_id)) {
-            Ok(_) => match afc.get_file_info(format!("./{}/{}", PKG_PATH, bundle_id)) {
+        Err(_) => match afc.make_directory(format!("./{PKG_PATH}/{bundle_id}")) {
+            Ok(_) => match afc.get_file_info(format!("./{PKG_PATH}/{bundle_id}")) {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Unable to read bundle ID info: {:?}", e);
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
 
     // Yeet app pls
     let handle = match afc.file_open(
-        format!("./{}/{}/app.ipa", PKG_PATH, bundle_id),
+        format!("./{PKG_PATH}/{bundle_id}/app.ipa"),
         AfcFileMode::WriteOnly,
     ) {
         Ok(h) => h,
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> 
 
     trace!("Installing...");
     match inst_client.install(
-        format!("./{}/{}/app.ipa", PKG_PATH, bundle_id),
+        format!("./{PKG_PATH}/{bundle_id}/app.ipa"),
         Some(client_opts.clone()), // nobody understands libplist, but clone is necessary I guess
     ) {
         Ok(_) => {}

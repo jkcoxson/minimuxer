@@ -2,9 +2,12 @@
 
 use log::{error, info};
 use rusty_libimobiledevice::idevice;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const VERSIONS_DICTIONARY: &str =
     "https://raw.githubusercontent.com/jkcoxson/JitStreamer/master/versions.json";
+
+pub static DMG_MOUNTED: AtomicBool = AtomicBool::new(false);
 
 #[no_mangle]
 /// Mount iOS's developer DMG
@@ -14,7 +17,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
     let c_str = std::ffi::CStr::from_ptr(docs_path);
 
     let docs_path = &c_str.to_str().unwrap()[7..];
-    let dmg_docs_path = format!("{}/DMG", docs_path);
+    let dmg_docs_path = format!("{docs_path}/DMG");
 
     // This will take a while, especially if the muxer is still waking up
     // Let's move to a new thread
@@ -58,6 +61,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                     Ok(a) => match a.array_get_size() {
                         Ok(n) => {
                             if n > 0 {
+                                DMG_MOUNTED.store(true, Ordering::Relaxed);
                                 info!("Developer disk image already mounted");
                                 break;
                             }
@@ -133,7 +137,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                             continue;
                         }
                     };
-                    let zip_path = format!("{}/dmg.zip", dmg_docs_path);
+                    let zip_path = format!("{dmg_docs_path}/dmg.zip");
                     let mut out = match std::fs::File::create(&zip_path) {
                         Ok(out) => out,
                         Err(_) => {
@@ -156,7 +160,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                         }
                     };
                     // Create tmp path
-                    let tmp_path = format!("{}/tmp", dmg_docs_path);
+                    let tmp_path = format!("{dmg_docs_path}/tmp");
                     info!("tmp path {}", tmp_path);
                     std::fs::create_dir_all(&tmp_path).unwrap();
                     // Unzip zip
@@ -192,12 +196,11 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                     }
                     // Move DMG to JIT Shipper directory
                     let ios_dmg = dmg_path.join("DeveloperDiskImage.dmg");
-                    std::fs::rename(ios_dmg, format!("{}/{}.dmg", dmg_docs_path, ios_version))
-                        .unwrap();
+                    std::fs::rename(ios_dmg, format!("{dmg_docs_path}/{ios_version}.dmg")).unwrap();
                     let ios_sig = dmg_path.join("DeveloperDiskImage.dmg.signature");
                     std::fs::rename(
                         ios_sig,
-                        format!("{}/{}.dmg.signature", dmg_docs_path, ios_version),
+                        format!("{dmg_docs_path}/{ios_version}.dmg.signature"),
                     )
                     .unwrap();
 
@@ -212,7 +215,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                     format!("{}/{}.dmg", dmg_docs_path, &ios_version)
                 };
 
-                match mim.upload_image(&path, "Developer", format!("{}.signature", path)) {
+                match mim.upload_image(&path, "Developer", format!("{path}.signature")) {
                     Ok(_) => {
                         info!("Successfully uploaded the image");
                     }
@@ -222,8 +225,9 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                     }
                 }
 
-                match mim.mount_image(&path, "Developer", format!("{}.signature", path)) {
+                match mim.mount_image(&path, "Developer", format!("{path}.signature")) {
                     Ok(_) => {
+                        DMG_MOUNTED.store(true, Ordering::Relaxed);
                         info!("Successfully mounted the image");
                         break;
                     }

@@ -111,7 +111,7 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
         }
     }
 
-    match debug_server.send_command(format!("QSetWorkingDir: {}", working_directory).into()) {
+    match debug_server.send_command(format!("QSetWorkingDir: {working_directory}").into()) {
         Ok(res) => info!("Successfully set working directory: {:?}", res),
         Err(e) => {
             error!("Error setting working directory: {:?}", e);

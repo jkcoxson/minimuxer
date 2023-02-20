@@ -277,8 +277,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
     ]) {
         Ok(_) => {}
         Err(e) => println!(
-            "\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!! Error: {}\n\n",
-            e
+            "\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!! Error: {e}\n\n"
         ),
     }
 

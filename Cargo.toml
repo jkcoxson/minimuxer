@@ -17,6 +17,8 @@ reqwest = { version = "0.11.12", features = ["blocking"] }
 serde = { version = "1.0.147" }
 serde_json = { version = "1.0.87" }
 zip = { version = "0.6.3" }
+plist = { version = "1" }
+num_enum = { version = "0.5" }
 
 [build-dependencies]
 cbindgen = "0.20.0"
