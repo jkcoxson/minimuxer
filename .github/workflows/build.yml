@@ -1,0 +1,49 @@
+name: Build minimuxer
+
+on: [push]
+
+jobs:
+  build:
+    name: Build minimuxer
+    if: startsWith(github.event.head_commit.message, '[build]')
+    concurrency:
+      group: ${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: macos-12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Install rust targets for iOS
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+      - name: Cache rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1.4.1
+        with:
+          xcode-version: 14.2
+
+      - name: Build
+        run: make build
+
+      - name: Upload to release
+        uses: IsaacShelton/update-existing-release@v1.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: "Build"
+          tag: "build"
+          files: |
+            target/libminimuxer.a
+            target/libminimuxer-sim.a
+            minimuxer.h
+          body: |
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
