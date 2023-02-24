@@ -90,16 +90,21 @@ make_test!(remove_profiles, {
 
 make_test!(ready, {
     info!("Starting heartbeat");
+    println!();
     start_beat(fetch_first_device(Some(5000)).unwrap().get_udid());
+    println!();
 
     info!("Starting auto mounter");
+    println!();
     unsafe {
         minimuxer_auto_mount(to_c_char(
             "./target/dmg", /* for some reason this results in ./t/dmg/DMG ?? */
         ))
     }
+    println!();
 
     info!("Sleeping for 10 seconds to allow for image to be mounted and heartbeat to start");
+    println!();
     std::thread::sleep(std::time::Duration::from_secs(10));
 
     assert_eq!(unsafe { minimuxer_ready() }, 1);
