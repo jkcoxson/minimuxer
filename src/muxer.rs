@@ -204,6 +204,8 @@ fn convert_ip(ip: IpAddr) -> [u8; 152] {
     data
 }
 
+pub static STARTED: AtomicBool = AtomicBool::new(false);
+
 #[no_mangle]
 /// Starts the muxer and heartbeat client
 /// # Arguments
@@ -214,11 +216,9 @@ pub unsafe extern "C" fn minimuxer_c_start(
     pairing_file: *mut libc::c_char,
     log_path: *mut libc::c_char,
 ) -> libc::c_int {
-    static STARTED: AtomicBool = AtomicBool::new(false);
-
     if STARTED.load(Ordering::Relaxed) {
         info!("Already started minimuxer, skipping");
-        return 0;
+        return Errors::Success.into();
     }
 
     if pairing_file.is_null() || log_path.is_null() {
@@ -284,7 +284,6 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     info!("Logger initialized!!");
 
-    #[allow(clippy::redundant_clone)]
     let udid = match pairing_file.clone().dict_get_item("UDID") {
         Ok(u) => match u.get_string_val() {
             Ok(s) => s,
@@ -302,9 +301,9 @@ pub unsafe extern "C" fn minimuxer_c_start(
     listen(pairing_file);
     start_beat(udid);
 
+    info!("minimuxer has started!");
     STARTED.store(true, Ordering::Relaxed);
-
-    0
+    Errors::Success.into()
 }
 
 #[no_mangle]
