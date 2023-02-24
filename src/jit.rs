@@ -1,7 +1,7 @@
 // Jackson Coxson
 
 use libc::c_int;
-use log::{error, info, trace};
+use log::{debug, error, info};
 use plist_plus::Plist;
 use rusty_libimobiledevice::services::instproxy::InstProxyClient;
 
@@ -13,6 +13,7 @@ use crate::{errors::Errors, fetch_first_device, test_device_connection};
 /// Don't be stupid
 pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int {
     if app_id.is_null() {
+        error!("App ID is null");
         return Errors::FunctionArgs.into();
     }
 
@@ -20,33 +21,37 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
 
     let app_id = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(e) => {
+            error!("Error converting app ID: {:?}", e);
+            return Errors::FunctionArgs.into();
+        }
     }
     .to_string();
 
+    info!("Debugging app ID: {}", app_id);
+
     if !test_device_connection() {
+        error!("No device connection");
         return Errors::NoConnection.into();
     }
 
-    trace!("Getting device from muxer");
     let device = match fetch_first_device(Some(5000)) {
-        Ok(d) => d,
-        Err(_) => return Errors::NoDevice.into(),
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
     };
 
-    trace!("Creating debug server");
     let debug_server = match device.new_debug_server("minimuxer") {
         Ok(d) => d,
-        Err(_) => {
-            error!("Failed to start debug server!");
+        Err(e) => {
+            error!("Failed to start debug server: {:?}", e);
             return Errors::CreateDebug.into();
         }
     };
 
     let instproxy_client = match device.new_instproxy_client("minimuxer") {
         Ok(i) => i,
-        Err(_) => {
-            error!("Failed to create instproxy client!");
+        Err(e) => {
+            error!("Failed to create instproxy client: {:?}", e);
             return Errors::CreateInstproxy.into();
         }
     };
@@ -61,9 +66,10 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
             "Container".to_string(),
         ],
     );
+
     let lookup_results = match instproxy_client.lookup(vec![app_id.clone()], Some(client_opts)) {
         Ok(apps) => {
-            trace!("Successfully looked up apps: {:?}", apps);
+            debug!("Successfully looked up apps: {:?}", apps);
             apps
         }
         Err(e) => {
@@ -75,33 +81,29 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
 
     let working_directory = match lookup_results.dict_get_item("Container") {
         Ok(p) => p,
-        Err(_) => {
-            error!("App not found");
+        Err(e) => {
+            error!("App not found: {:?}", e);
             return Errors::FindApp.into();
         }
     };
 
     let working_directory = match working_directory.get_string_val() {
         Ok(p) => p,
-        Err(_) => {
-            error!("App not found");
+        Err(e) => {
+            error!("Error when getting string val: {:?}", e);
             return Errors::FindApp.into();
         }
     };
-    trace!("Working directory: {}", working_directory);
+    debug!("Working directory: {}", working_directory);
 
     let bundle_path = match instproxy_client.get_path_for_bundle_identifier(app_id) {
-        Ok(p) => {
-            info!("Successfully found bundle path");
-            p
-        }
+        Ok(p) => p,
         Err(e) => {
             error!("Error getting path for bundle identifier: {:?}", e);
             return Errors::BundlePath.into();
         }
     };
-
-    info!("Bundle Path: {}", bundle_path);
+    info!("Successfully found bundle path: {bundle_path}");
 
     match debug_server.send_command("QSetMaxPacketSize: 1024".into()) {
         Ok(res) => info!("Successfully set max packet size: {:?}", res),
@@ -136,12 +138,13 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
     }
 
     match debug_server.send_command("D".into()) {
-        Ok(res) => info!("Detaching: {:?}", res),
+        Ok(res) => {
+            info!("Success: {:?}", res);
+            Errors::Success.into()
+        }
         Err(e) => {
             error!("Error detaching: {:?}", e);
-            return Errors::Detach.into();
+            Errors::Detach.into()
         }
     }
-
-    Errors::Success.into()
 }

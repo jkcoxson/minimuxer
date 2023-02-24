@@ -8,7 +8,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use log::{info, warn, LevelFilter};
+use log::{error, info, warn, LevelFilter};
 use plist_plus::{error::PlistError, Plist};
 use simplelog::{
     ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
@@ -263,6 +263,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
             // Allow logging from everywhere, to include rusty_libimobiledevice and any other useful debugging info
             ConfigBuilder::new()
                 .add_filter_ignore_str("plist_plus") // plist_plus spams logs
+                .set_target_level(LevelFilter::Off)
                 .build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
@@ -276,9 +277,9 @@ pub unsafe extern "C" fn minimuxer_c_start(
         ),
     ]) {
         Ok(_) => {}
-        Err(e) => println!(
-            "\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!! Error: {e}\n\n"
-        ),
+        Err(e) => {
+            println!("\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!! Error: {e}\n\n")
+        }
     }
 
     info!("Logger initialized!!");
@@ -287,9 +288,15 @@ pub unsafe extern "C" fn minimuxer_c_start(
     let udid = match pairing_file.clone().dict_get_item("UDID") {
         Ok(u) => match u.get_string_val() {
             Ok(s) => s,
-            Err(_) => return Errors::FunctionArgs.into(),
+            Err(e) => {
+                error!("Couldn't convert UDID to string: {:?}", e);
+                return Errors::FunctionArgs.into();
+            }
         },
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(e) => {
+            error!("Couldn't get UDID: {:?}", e);
+            return Errors::FunctionArgs.into();
+        }
     };
 
     listen(pairing_file);

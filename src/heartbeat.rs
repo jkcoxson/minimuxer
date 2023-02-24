@@ -17,13 +17,14 @@ pub fn start_beat(udid: String) {
             loop {
                 let device = match idevice::get_device(&udid) {
                     Ok(d) => d,
-                    Err(_) => {
+                    Err(e) => {
                         LAST_BEAT_SUCCESSFUL.store(false, Ordering::Relaxed);
-                        warn!("Could not get device from muxer for heartbeat");
+                        warn!("Could not get device from muxer for heartbeat: {:?}", e);
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         continue;
                     }
                 };
+
                 let hb = match device.new_heartbeat_client("minimuxer") {
                     Ok(h) => h,
                     Err(e) => {

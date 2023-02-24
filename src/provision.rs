@@ -5,10 +5,7 @@ use log::{error, info};
 use plist::Value;
 use plist_plus::Plist;
 
-use crate::{
-    errors::Errors, fetch_first_device, ok_or, some_or, test_device_connection,
-    util::RustyPlistConversion,
-};
+use crate::{errors::Errors, fetch_first_device, test_device_connection, RustyPlistConversion};
 
 #[no_mangle]
 /// Installs a provisioning profile on the device
@@ -27,33 +24,36 @@ pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
     let plist = Plist::new_data(&data);
     std::mem::forget(data);
 
+    info!("Installing provisioning profile");
+
     if !test_device_connection() {
+        error!("No device connection");
         return Errors::NoConnection.into();
     }
 
     let device = match fetch_first_device(Some(5000)) {
-        Ok(d) => d,
-        Err(_) => return Errors::NoDevice.into(),
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
     };
 
     let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
         Ok(m) => m,
-        Err(_) => {
+        Err(e) => {
+            error!("Failed to start misagent client: {:?}", e);
             return Errors::CreateMisagent.into();
         }
     };
 
     match mis_client.install(plist) {
-        Ok(_) => {}
+        Ok(_) => {
+            info!("Successfully installed provisioning profile!");
+            Errors::Success.into()
+        }
         Err(e) => {
             error!("Unable to install provisioning profile: {:?}", e);
-            return Errors::ProfileInstall.into();
+            Errors::ProfileInstall.into()
         }
     }
-
-    info!("Minimuxer finished installing profile!!");
-
-    Errors::Success.into()
 }
 
 #[no_mangle]
@@ -62,6 +62,7 @@ pub unsafe extern "C" fn minimuxer_install_provisioning_profile(
 /// Don't be stupid
 pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_char) -> c_int {
     if id.is_null() {
+        error!("Profile ID is null");
         return Errors::FunctionArgs.into();
     }
 
@@ -69,37 +70,43 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_
 
     let id = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(e) => {
+            error!("Error converting profile ID: {:?}", e);
+            return Errors::FunctionArgs.into();
+        }
     }
     .to_string();
 
+    info!("Removing profile with ID: {}", id);
+
     if !test_device_connection() {
+        error!("No device connection");
         return Errors::NoConnection.into();
     }
 
     let device = match fetch_first_device(Some(5000)) {
-        Ok(d) => d,
-        Err(_) => return Errors::NoDevice.into(),
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
     };
 
     let mis_client = match device.new_misagent_client("minimuxer-install-prov") {
         Ok(m) => m,
-        Err(_) => {
-            return Errors::CreateInstproxy.into();
+        Err(e) => {
+            error!("Failed to start misagent client: {:?}", e);
+            return Errors::CreateMisagent.into();
         }
     };
 
     match mis_client.remove(id) {
-        Ok(_) => {}
+        Ok(_) => {
+            info!("Successfully removed profile");
+            Errors::Success.into()
+        }
         Err(e) => {
             error!("Unable to remove provisioning profile: {:?}", e);
-            return Errors::ProfileRemove.into();
+            Errors::ProfileRemove.into()
         }
     }
-
-    info!("Minimuxer finished removing profile!!");
-
-    Errors::Success.into()
 }
 
 #[no_mangle]
@@ -112,27 +119,40 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profile(id: *mut libc::c_
 /// Don't be stupid
 pub unsafe extern "C" fn minimuxer_remove_provisioning_profiles(ids: *mut libc::c_char) -> c_int {
     if ids.is_null() {
+        error!("IDs are null");
         return Errors::FunctionArgs.into();
     }
 
     let c_str = std::ffi::CStr::from_ptr(ids);
 
-    let ids = ok_or!(c_str.to_str(), return Errors::FunctionArgs.into()).to_string();
+    let ids = match c_str.to_str() {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Error converting IDs: {:?}", e);
+            return Errors::FunctionArgs.into();
+        }
+    }
+    .to_string();
+    info!("Removing profiles containing IDs: {}", ids);
     let ids = ids.split(',');
 
     if !test_device_connection() {
+        error!("No device connection");
         return Errors::NoConnection.into();
     }
 
-    let device = ok_or!(
-        fetch_first_device(Some(5000)),
-        return Errors::NoDevice.into()
-    );
+    let device = match fetch_first_device(Some(5000)) {
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
+    };
 
-    let mis_client = ok_or!(
-        device.new_misagent_client("minimuxer-remove-prov"),
-        return Errors::CreateInstproxy.into()
-    );
+    let mis_client = match device.new_misagent_client("minimuxer-remove-prov") {
+        Ok(m) => m,
+        Err(e) => {
+            error!("Failed to create instproxy: {:?}", e);
+            return Errors::CreateInstproxy.into();
+        }
+    };
 
     let all_ids = match mis_client.copy(false) {
         // I had issues with plist_plus not being able to parse around half of my profiles, so we use a helper function to convert to rusty plist
@@ -157,30 +177,38 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profiles(ids: *mut libc::
     };
 
     for cert_data in all_ids {
-        let cert_data = some_or!(
-            cert_data.as_data(),
-            error!("Unable to get cert data val"),
-            continue
-        );
+        let cert_data = match cert_data.as_data() {
+            Some(c) => c,
+            None => {
+                error!("Unable to get cert data val");
+                continue;
+            }
+        };
 
         const PLIST_PREFIX: &[u8] = b"<?xml version=";
         const PLIST_SUFFIX: &[u8] = b"</plist>";
 
         // Get indexes of plist data prefix and suffix using windows
-        let prefix = some_or!(
-            cert_data
-                .windows(PLIST_PREFIX.len())
-                .position(|window| window == PLIST_PREFIX),
-            error!("Unable to get prefix"),
-            continue
-        );
-        let suffix = some_or!(
-            cert_data
-                .windows(PLIST_SUFFIX.len())
-                .position(|window| window == PLIST_SUFFIX),
-            error!("Unable to get suffix"),
-            continue
-        )
+        let prefix = match cert_data
+            .windows(PLIST_PREFIX.len())
+            .position(|window| window == PLIST_PREFIX)
+        {
+            Some(p) => p,
+            None => {
+                error!("Unable to get prefix");
+                continue;
+            }
+        };
+        let suffix = match cert_data
+            .windows(PLIST_SUFFIX.len())
+            .position(|window| window == PLIST_SUFFIX)
+        {
+            Some(p) => p,
+            None => {
+                error!("Unable to get prefix");
+                continue;
+            }
+        }
             // the position will return the starting index; we want the ending index
             // adding the length of the suffix gives us it
             + PLIST_SUFFIX.len();
@@ -246,6 +274,5 @@ pub unsafe extern "C" fn minimuxer_remove_provisioning_profiles(ids: *mut libc::
     }
 
     info!("Finished removing inactive profiles");
-
     Errors::Success.into()
 }

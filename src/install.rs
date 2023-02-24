@@ -1,10 +1,7 @@
 // Jackson Coxson
 
-use log::{error, info, trace};
-use rusty_libimobiledevice::{
-    idevice::{self},
-    services::{afc::AfcFileMode, instproxy::InstProxyClient},
-};
+use log::{error, info};
+use rusty_libimobiledevice::services::{afc::AfcFileMode, instproxy::InstProxyClient};
 
 use crate::{errors::Errors, fetch_first_device, test_device_connection};
 
@@ -20,6 +17,7 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
     bytes_len: libc::c_ulong,
 ) -> libc::c_int {
     if bundle_id.is_null() || bytes_ptr.is_null() {
+        error!("One of arguments is null");
         return Errors::FunctionArgs.into();
     }
 
@@ -27,23 +25,25 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
 
     let bundle_id = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(e) => {
+            error!("Error converting bundle ID: {:?}", e);
+            return Errors::FunctionArgs.into();
+        }
     }
     .to_string();
 
     let slc = std::slice::from_raw_parts(bytes_ptr, bytes_len as usize).to_vec();
 
+    info!("Yeeting IPA for bundle ID: {}", bundle_id);
+
     if !test_device_connection() {
+        error!("No device connection");
         return Errors::NoConnection.into();
     }
 
-    trace!("Getting device from muxer");
     let device = match fetch_first_device(Some(5000)) {
-        Ok(d) => d,
-        Err(e) => {
-            error!("Unable to get device: {:?}", e);
-            return Errors::NoDevice.into();
-        }
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
     };
 
     // Start an AFC client
@@ -107,7 +107,10 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
 
     info!("Sending bytes of ipa");
     match afc.file_write(handle, slc) {
-        Ok(_) => Errors::Success.into(),
+        Ok(_) => {
+            info!("Success");
+            Errors::Success.into()
+        }
         Err(e) => {
             error!("Unable to write ipa: {:?}", e);
             Errors::RwAfc.into()
@@ -122,6 +125,7 @@ pub unsafe extern "C" fn minimuxer_yeet_app_afc(
 /// Don't be stupid
 pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> libc::c_int {
     if bundle_id.is_null() {
+        error!("Bundle ID is null");
         return Errors::FunctionArgs.into();
     }
 
@@ -129,21 +133,23 @@ pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> 
 
     let bundle_id = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(e) => {
+            error!("Error converting bundle ID: {:?}", e);
+            return Errors::FunctionArgs.into();
+        }
     }
     .to_string();
 
+    info!("Installing app for bundle ID: {}", bundle_id);
+
     if !test_device_connection() {
+        error!("No device connection");
         return Errors::NoConnection.into();
     }
 
-    trace!("Getting device from muxer");
     let device = match fetch_first_device(Some(5000)) {
-        Ok(d) => d,
-        Err(e) => {
-            error!("Unable to get device: {:?}", e);
-            return Errors::NoDevice.into();
-        }
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
     };
 
     let mut client_opts = InstProxyClient::client_options_new();
@@ -159,20 +165,20 @@ pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> 
         }
     };
 
-    trace!("Installing...");
+    info!("Installing");
     match inst_client.install(
         format!("./{PKG_PATH}/{bundle_id}/app.ipa"),
         Some(client_opts.clone()), // nobody understands libplist, but clone is necessary I guess
     ) {
-        Ok(_) => {}
+        Ok(_) => {
+            info!("Done!");
+            Errors::Success.into()
+        }
         Err(e) => {
             error!("Unable to install app: {:?}", e);
-            return Errors::InstallApp.into();
+            Errors::InstallApp.into()
         }
     }
-
-    info!("Done!");
-    Errors::Success.into()
 }
 
 #[no_mangle]
@@ -181,6 +187,7 @@ pub unsafe extern "C" fn minimuxer_install_ipa(bundle_id: *mut libc::c_char) -> 
 /// Don't be stupid
 pub unsafe extern "C" fn minimuxer_remove_app(bundle_id: *mut libc::c_char) -> libc::c_int {
     if bundle_id.is_null() {
+        error!("Bundle ID is null");
         return Errors::FunctionArgs.into();
     }
 
@@ -188,21 +195,39 @@ pub unsafe extern "C" fn minimuxer_remove_app(bundle_id: *mut libc::c_char) -> l
 
     let bundle_id = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return Errors::FunctionArgs.into(),
+        Err(e) => {
+            error!("Error converting bundle ID: {:?}", e);
+            return Errors::FunctionArgs.into();
+        }
     }
     .to_string();
 
+    info!("Removing app for {}", bundle_id);
+
     if !test_device_connection() {
+        error!("No device connection");
         return Errors::NoConnection.into();
     }
 
-    let device = match idevice::get_first_device() {
-        Ok(d) => d,
-        Err(_) => return Errors::NoDevice.into(),
+    let device = match fetch_first_device(Some(5000)) {
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
     };
-    let instproxy_client = device.new_instproxy_client("minimuxer-remove-app").unwrap();
+
+    let instproxy_client = match device.new_instproxy_client("minimuxer-remove-app") {
+        Ok(i) => i,
+        Err(e) => {
+            error!("Unable to start instproxy: {:?}", e);
+            return Errors::CreateInstproxy.into();
+        }
+    };
+
+    info!("Removing");
     match instproxy_client.uninstall(bundle_id, None) {
-        Ok(_) => Errors::Success.into(),
+        Ok(_) => {
+            info!("Done!");
+            Errors::Success.into()
+        }
         Err(e) => {
             error!("Unable to uninstall app!! {:?}", e);
             Errors::UninstallApp.into()
