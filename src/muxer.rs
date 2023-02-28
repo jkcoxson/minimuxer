@@ -263,7 +263,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
             // Allow logging from everywhere, to include rusty_libimobiledevice and any other useful debugging info
             ConfigBuilder::new()
                 .add_filter_ignore_str("plist_plus") // plist_plus spams logs
-                .set_target_level(LevelFilter::Off)
+                .set_target_level(LevelFilter::Error)
                 .build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
