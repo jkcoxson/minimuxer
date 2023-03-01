@@ -23,7 +23,7 @@ build:
 xcframework: build
 	@echo "xcframework"
 	xcodebuild -create-xcframework \
-			-library target/libminimuxer.a-sim -headers minimuxer.h \
+			-library target/libminimuxer.a-sim.a -headers minimuxer.h \
 			-library target/libminimuxer.a -headers minimuxer.h \
 			-output minimuxer.xcframework
 
