@@ -1,0 +1,5 @@
+module minimuxer {
+	header "minimuxer.h"
+
+	export *
+}

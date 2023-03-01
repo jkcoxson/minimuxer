@@ -7,7 +7,10 @@ add_targets:
 build:
 	@echo "build aarch64-apple-ios"
 	@cargo build --release --target aarch64-apple-ios
-	@cp target/aarch64-apple-ios/release/lib$(TARGET).a target/lib$(TARGET).a
+	@echo "lipo"
+	@lipo -create \
+		-output target/lib$(TARGET)-ios.a \
+		target/aarch64-apple-ios/release/lib$(TARGET).a
 
 	@echo "build aarch64-apple-ios-sim"
 	@cargo build --release --target aarch64-apple-ios-sim
@@ -15,7 +18,6 @@ build:
 	@echo "build x86_64-apple-ios"
 	@cargo build --release --target x86_64-apple-ios
 
-	@echo "lipo"
 	@lipo -create \
 		-output target/lib$(TARGET)-sim.a \
 		target/aarch64-apple-ios-sim/release/lib$(TARGET).a \
@@ -42,11 +44,75 @@ clean:
 
 xcframework: build
 	@echo "xcframework"
+	
+	@if [ -d "include" ]; then \
+		echo "cleaning include"; \
+        rm -rf include; \
+    fi
 	@mkdir include
 	@cp $(TARGET).h include
+	@cp module.modulemap include
+
+	@if [ -d "$(TARGET).xcframework" ]; then \
+		echo "cleaning $(TARGET).xcframework"; \
+	    rm -rf $(TARGET).xcframework; \
+	fi
+	@xcodebuild \
+			-create-xcframework \
+			-library target/aarch64-apple-ios/release/lib$(TARGET).a \
+			-headers include/ \
+			-library target/lib$(TARGET)-sim.a \
+			-headers include/ \
+			-output $(TARGET).xcframework
+
+xcframework_frameworks: build
+	@echo "xcframework_frameworks"
+	
+	@if [ -d "include" ]; then \
+		echo "cleaning include"; \
+        rm -rf include; \
+    fi
+	@mkdir include
+	@cp $(TARGET).h include
+	@cp module.modulemap include
+
+	@if [ -d "target/ios" ]; then \
+		echo "cleaning target/ios"; \
+        rm -rf target/ios; \
+    fi
+	@mkdir target/ios
+	@mkdir target/ios/$(TARGET).framework
+	@mkdir target/ios/$(TARGET).framework/Headers
+
+	@if [ -d "target/sim" ]; then \
+		echo "cleaning target/sim"; \
+        rm -rf target/sim; \
+    fi
+	@mkdir target/sim
+	@mkdir target/sim/$(TARGET).framework
+	@mkdir target/sim/$(TARGET).framework/Headers
+
+	@cp include/*.* target/ios/$(TARGET).framework/Headers
+	@libtool -static \
+		-o target/ios/$(TARGET).framework/$(TARGET) \
+		target/lib$(TARGET)-ios.a
+	
+	@cp include/*.* target/sim/$(TARGET).framework/Headers
+	@xcrun \
+		-sdk iphonesimulator \
+		libtool -static \
+		-o target/sim/$(TARGET).framework/$(TARGET) \
+		target/lib$(TARGET)-sim.a
+
+	@if [ -d "$(TARGET).xcframework" ]; then \
+		echo "cleaning $(TARGET).xcframework"; \
+        rm -rf $(TARGET).xcframework; \
+    fi
 	@xcodebuild -create-xcframework \
-			-library target/lib$(TARGET).a -headers ./include \
-			-library target/lib$(TARGET)-sim.a -headers ./include \
+			-library target/sim/$(TARGET).framework \
+			-headers include/ \
+			-library target/ios/$(TARGET).framework \
+			-headers include/ \
 			-output $(TARGET).xcframework
 
 zip: xcframework
