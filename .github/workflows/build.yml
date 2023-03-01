@@ -33,13 +33,7 @@ jobs:
         xcode-version: 14.2
 
     - name: Build
-      run: make build
-
-    - name: Create XCFramework
-      run: make xcframework
-
-    - name: ZIP XCFramework
-      run: zip -r minimuxer.xcframework.zip minimuxer.xcframework
+      run: make zip
 
     - name: Upload to release
       uses: IsaacShelton/update-existing-release@v1.3.1
@@ -48,9 +42,6 @@ jobs:
         release: "Build"
         tag: "build"
         files: |
-          target/libminimuxer.a
-          target/libminimuxer-sim.a
-          minimuxer.h
           minimuxer.xcframework.zip
         body: |
           Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}

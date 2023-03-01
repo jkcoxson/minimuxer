@@ -1,37 +1,45 @@
-# You can use `make copy SIDESTORE_REPO="..."` to change the SideStore repo location
-SIDESTORE_REPO ?= ../SideStore
+# Makefile for building minimuxer as a static library for iOS
 
 add_targets:
 	@echo "add_targets"
 	rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
 build:
-	@echo "build"
-	cargo build --release --target aarch64-apple-ios
-	strip target/aarch64-apple-ios/release/libminimuxer.a
-	cp target/aarch64-apple-ios/release/libminimuxer.a target/
+	@echo "build aarch64-apple-ios"
+	@cargo build --release --target aarch64-apple-ios
+	@strip target/aarch64-apple-ios/release/libminimuxer.a
 
-	cargo build --release --target aarch64-apple-ios-sim
-	cargo build --release --target x86_64-apple-ios
-	strip target/aarch64-apple-ios-sim/release/libminimuxer.a
-	strip target/x86_64-apple-ios/release/libminimuxer.a
-	lipo -create \
-		-output target/libminimuxer-sim.a \
-		target/aarch64-apple-ios-sim/release/libminimuxer.a \
-		target/x86_64-apple-ios/release/libminimuxer.a
+	@echo "build aarch64-apple-ios-sim"
+	@cargo build --release --target aarch64-apple-ios-sim
+	@strip target/aarch64-apple-ios-sim/release/libminimuxer.a
+
+	@echo "build x86_64-apple-ios"
+	@cargo build --release --target x86_64-apple-ios
+	@strip target/x86_64-apple-ios/release/libminimuxer.a
+
+clean:
+	@echo "clean"
+	@if [ -d "target" ]; then \
+		echo "cleaning target"; \
+        rm -r target; \
+    fi
+	@if [ -d "minimuxer.xcframework" ]; then \
+		echo "cleaning minimuxer.xcframework"; \
+        rm -r minimuxer.xcframework; \
+    fi
+	@if [ -f "minimuxer.xcframework.zip" ]; then \
+		echo "cleaning minimuxer.xcframework.zip"; \
+        rm minimuxer.xcframework.zip; \
+    fi
 
 xcframework: build
 	@echo "xcframework"
 	xcodebuild -create-xcframework \
-			-library target/libminimuxer.a-sim.a -headers minimuxer.h \
-			-library target/libminimuxer.a -headers minimuxer.h \
+			-library target/aarch64-apple-ios/release/libminimuxer.a -headers ./ \
+			-library target/aarch64-apple-ios-sim/release/libminimuxer.a -headers ./ \
+			-library target/x86_64-apple-ios/release/libminimuxer.a ./ \
 			-output minimuxer.xcframework
 
-copy: build
-	@echo "copy"
-	@echo SIDESTORE_REPO: $(SIDESTORE_REPO)
-
-	cp target/libminimuxer.a "$(SIDESTORE_REPO)/Dependencies/minimuxer"
-	cp target/libminimuxer-sim.a "$(SIDESTORE_REPO)/Dependencies/minimuxer"
-	cp minimuxer.h "$(SIDESTORE_REPO)/Dependencies/minimuxer"
-	touch "$(SIDESTORE_REPO)/Dependencies/.skip-prebuilt-fetch-minimuxer"
+zip: xcframework
+	@echo "zip"
+	zip -r minimuxer.xcframework.zip minimuxer.xcframework
