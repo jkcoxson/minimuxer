@@ -1,4 +1,4 @@
-# Makefile for building minimuxer as a static library for iOS
+TARGET="minimuxer"
 
 add_targets:
 	@echo "add_targets"
@@ -7,39 +7,48 @@ add_targets:
 build:
 	@echo "build aarch64-apple-ios"
 	@cargo build --release --target aarch64-apple-ios
-	@strip target/aarch64-apple-ios/release/libminimuxer.a
+	@cp target/aarch64-apple-ios/release/lib$(TARGET).a target/lib$(TARGET).a
 
 	@echo "build aarch64-apple-ios-sim"
 	@cargo build --release --target aarch64-apple-ios-sim
-	@strip target/aarch64-apple-ios-sim/release/libminimuxer.a
 
 	@echo "build x86_64-apple-ios"
 	@cargo build --release --target x86_64-apple-ios
-	@strip target/x86_64-apple-ios/release/libminimuxer.a
+
+	@echo "lipo"
+	@lipo -create \
+		-output target/lib$(TARGET)-sim.a \
+		target/aarch64-apple-ios-sim/release/lib$(TARGET).a \
+		target/x86_64-apple-ios/release/lib$(TARGET).a
 
 clean:
 	@echo "clean"
+	@if [ -d "include" ]; then \
+		echo "cleaning include"; \
+        rm -r include; \
+    fi
 	@if [ -d "target" ]; then \
 		echo "cleaning target"; \
         rm -r target; \
     fi
-	@if [ -d "minimuxer.xcframework" ]; then \
-		echo "cleaning minimuxer.xcframework"; \
-        rm -r minimuxer.xcframework; \
+	@if [ -d "$(TARGET).xcframework" ]; then \
+		echo "cleaning $(TARGET).xcframework"; \
+        rm -r $(TARGET).xcframework; \
     fi
-	@if [ -f "minimuxer.xcframework.zip" ]; then \
-		echo "cleaning minimuxer.xcframework.zip"; \
-        rm minimuxer.xcframework.zip; \
+	@if [ -f "$(TARGET).xcframework.zip" ]; then \
+		echo "cleaning $(TARGET).xcframework.zip"; \
+        rm $(TARGET).xcframework.zip; \
     fi
 
 xcframework: build
 	@echo "xcframework"
-	xcodebuild -create-xcframework \
-			-library target/aarch64-apple-ios/release/libminimuxer.a -headers ./ \
-			-library target/aarch64-apple-ios-sim/release/libminimuxer.a -headers ./ \
-			-library target/x86_64-apple-ios/release/libminimuxer.a -headers ./ \
-			-output minimuxer.xcframework
+	@mkdir include
+	@cp $(TARGET).h include
+	@xcodebuild -create-xcframework \
+			-library target/lib$(TARGET).a -headers ./include \
+			-library target/lib$(TARGET)-sim.a -headers ./include \
+			-output $(TARGET).xcframework
 
 zip: xcframework
 	@echo "zip"
-	zip -r minimuxer.xcframework.zip minimuxer.xcframework
+	zip -r $(TARGET).xcframework.zip $(TARGET).xcframework
