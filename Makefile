@@ -37,7 +37,7 @@ xcframework: build
 	xcodebuild -create-xcframework \
 			-library target/aarch64-apple-ios/release/libminimuxer.a -headers ./ \
 			-library target/aarch64-apple-ios-sim/release/libminimuxer.a -headers ./ \
-			-library target/x86_64-apple-ios/release/libminimuxer.a ./ \
+			-library target/x86_64-apple-ios/release/libminimuxer.a -headers ./ \
 			-output minimuxer.xcframework
 
 zip: xcframework
