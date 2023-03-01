@@ -50,8 +50,9 @@ xcframework: build
         rm -rf include; \
     fi
 	@mkdir include
-	@cp $(TARGET).h include
-	@cp module.modulemap include
+	@mkdir include/$(TARGET)/
+	@cp $(TARGET).h include/$(TARGET)/
+	@cp module.modulemap include/$(TARGET)/
 
 	@if [ -d "$(TARGET).xcframework" ]; then \
 		echo "cleaning $(TARGET).xcframework"; \
@@ -73,8 +74,9 @@ xcframework_frameworks: build
         rm -rf include; \
     fi
 	@mkdir include
-	@cp $(TARGET).h include
-	@cp module.modulemap include
+	@mkdir include/$(TARGET)
+	@cp $(TARGET).h include/$(TARGET)
+	@cp module.modulemap include/$(TARGET)
 
 	@if [ -d "target/ios" ]; then \
 		echo "cleaning target/ios"; \
@@ -117,4 +119,8 @@ xcframework_frameworks: build
 
 zip: xcframework
 	@echo "zip"
+	@if [ -f "$(TARGET).xcframework.zip" ]; then \
+		echo "cleaning $(TARGET).xcframework.zip"; \
+        rm $(TARGET).xcframework.zip; \
+    fi
 	zip -r $(TARGET).xcframework.zip $(TARGET).xcframework
