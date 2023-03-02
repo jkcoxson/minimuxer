@@ -2,6 +2,26 @@
 
 minimuxer is the lockdown muxer used by [SideStore](https://github.com/SideStore/SideStore). It runs on device through [em_proxy](https://github.com/SideStore/em_proxy).
 
+## Building
+
+```
+make build # builds static libs
+make xcframework # builds an xcframework
+make zip # same as `xcframework`, and zips the final product for upload to GitHub release
+```
+
+### Publishing new release
+
+We use a github action to generate a `.xcframework` for use in Swift PM or XCode.
+
+This overwrites the last build on the tag `Build`.
+
+Either push a commit with `[build]` as the prefix for the commit message or push an empty commit with:
+
+```
+git commit --allow-empty -m "[build]"
+```
+
 ## Development
 
 ### Off device
