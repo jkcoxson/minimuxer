@@ -6,11 +6,12 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::sync::Once;
 
+use crate::device::{fetch_udid as rust_fetch_udid, minimuxer_fetch_udid};
 use crate::errors::Errors;
 use crate::heartbeat::start_beat;
 use crate::mounter::minimuxer_auto_mount;
 use crate::provision::minimuxer_remove_provisioning_profiles;
-use crate::{fetch_first_device, minimuxer_ready};
+use crate::{fetch_first_device, minimuxer_free_string, minimuxer_ready};
 
 /* Utils */
 
@@ -24,14 +25,14 @@ fn init() {
             // Allow logging from everywhere, to include rusty_libimobiledevice and any other useful debugging info
             ConfigBuilder::new()
                 .add_filter_ignore_str("plist_plus") // plist_plus spams logs
-                .set_target_level(LevelFilter::Off)
+                .set_target_level(LevelFilter::Error)
                 .build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
         )
         .expect("logger failed to initialize");
 
-        info!("Successfully intialized tests");
+        info!("Successfully initialized tests");
         println!();
     });
 }
@@ -48,9 +49,10 @@ macro_rules! make_test {
     };
 }
 
+/// make sure to use `unsafe { minimuxer_free_string(input) };` to free the string after giving it to a minimuxer function
 fn to_c_char(input: &str) -> *mut c_char {
     let c_str = CString::new(input).unwrap();
-    c_str.into_raw() // this shouldn't cause a memory leak because minimuxer functions will take ownership
+    c_str.into_raw()
 }
 
 fn list_profiles() -> String {
@@ -74,7 +76,9 @@ make_test!(remove_profiles, {
     let input = "com.SideStore.SideStore";
     info!("Starting to remove profiles (input: \"{}\")", input);
     println!();
-    let output = unsafe { minimuxer_remove_provisioning_profiles(to_c_char(input)) };
+    let input = to_c_char(input);
+    let output = unsafe { minimuxer_remove_provisioning_profiles(input) };
+    unsafe { minimuxer_free_string(input) };
     println!();
     info!(
         "Got output: Errors::{:?}",
@@ -96,11 +100,11 @@ make_test!(ready, {
 
     info!("Starting auto mounter");
     println!();
-    unsafe {
-        minimuxer_auto_mount(to_c_char(
-            "./target/dmg", /* for some reason this results in ./t/dmg/DMG ?? */
-        ))
-    }
+    let input = to_c_char(
+        "./target/dmg", /* for some reason this results in ./t/dmg/DMG ?? */
+    );
+    unsafe { minimuxer_auto_mount(input) };
+    unsafe { minimuxer_free_string(input) };
     println!();
 
     info!("Sleeping for 10 seconds to allow for image to be mounted and heartbeat to start");
@@ -108,4 +112,21 @@ make_test!(ready, {
     std::thread::sleep(std::time::Duration::from_secs(10));
 
     assert_eq!(unsafe { minimuxer_ready() }, 1);
+});
+
+make_test!(fetch_udid, {
+    let rust_udid = rust_fetch_udid().unwrap_or("None".to_owned());
+    println!();
+    info!("UDID via Rust: {}", rust_udid);
+    println!();
+
+    let output = unsafe { minimuxer_fetch_udid() };
+
+    let c_str = unsafe { std::ffi::CStr::from_ptr(output) };
+    let udid = c_str.to_str().unwrap();
+    println!();
+    info!("UDID via extern C: {}", udid);
+    println!();
+    assert_eq!(rust_udid.as_str(), udid);
+    unsafe { minimuxer_free_string(output) };
 });

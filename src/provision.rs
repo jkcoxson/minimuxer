@@ -5,7 +5,9 @@ use log::{error, info};
 use plist::Value;
 use plist_plus::Plist;
 
-use crate::{errors::Errors, fetch_first_device, test_device_connection, RustyPlistConversion};
+use crate::{
+    device::fetch_first_device, errors::Errors, test_device_connection, RustyPlistConversion,
+};
 
 #[no_mangle]
 /// Installs a provisioning profile on the device

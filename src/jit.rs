@@ -5,7 +5,7 @@ use log::{debug, error, info};
 use plist_plus::Plist;
 use rusty_libimobiledevice::services::instproxy::InstProxyClient;
 
-use crate::{errors::Errors, fetch_first_device, test_device_connection};
+use crate::{device::fetch_first_device, errors::Errors, test_device_connection};
 
 #[no_mangle]
 /// Debugs an app from an app ID

@@ -26,4 +26,6 @@ pub enum Errors {
     ProfileInstall,
     ProfileRemove,
     NoConnection,
+    // TODO: use this in minimuxer_c_start
+    //UDIDMismatch,
 }

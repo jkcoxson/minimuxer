@@ -1,16 +1,18 @@
 // Jackson Coxson
 
-use std::io::Cursor;
-use std::{sync::atomic::Ordering, time::Duration};
+use std::{ffi::CString, io::Cursor, sync::atomic::Ordering};
 
-use heartbeat::LAST_BEAT_SUCCESSFUL;
-use log::{error, info};
-use mounter::DMG_MOUNTED;
-use muxer::STARTED;
+use crate::{
+    device::{fetch_first_device, test_device_connection},
+    heartbeat::LAST_BEAT_SUCCESSFUL,
+    mounter::DMG_MOUNTED,
+    muxer::STARTED,
+};
+use log::{info, trace};
 use plist::{Error, Value};
 use plist_plus::Plist;
-use rusty_libimobiledevice::idevice::{self, Device};
 
+pub mod device;
 mod errors;
 mod heartbeat;
 pub mod install;
@@ -36,10 +38,7 @@ pub unsafe extern "C" fn minimuxer_ready() -> libc::c_int {
     let device_exists = fetch_first_device(Some(5000)).is_some();
     let heartbeat_success = LAST_BEAT_SUCCESSFUL.load(Ordering::Relaxed);
     let dmg_mounted = DMG_MOUNTED.load(Ordering::Relaxed);
-    #[cfg(not(test))]
     let started = STARTED.load(Ordering::Relaxed);
-    #[cfg(test)]
-    let started = true; // minimuxer won't start in tests
 
     if !device_connection || !device_exists || !heartbeat_success || !dmg_mounted || !started {
         info!(
@@ -57,50 +56,11 @@ pub unsafe extern "C" fn minimuxer_ready() -> libc::c_int {
     1
 }
 
-/// Waits for the muxer to return the device
-/// This ensures that the muxer is running
-/// Returns an error once the timeout expires
-/// # Arguments
-/// * `timeout` - The time to wait in miliseconds
-/// # Returns
-/// The device
-pub fn fetch_first_device(timeout: Option<u16>) -> Option<Device> {
-    loop {
-        match idevice::get_first_device() {
-            Ok(d) => return Some(d),
-            Err(e) => {
-                if let Some(mut t) = timeout {
-                    t -= 10;
-                    if t == 0 {
-                        error!("Couldn't fetch first device: {:?}", e);
-                        return None;
-                    }
-                }
-            }
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-}
-
-/// Tests if the device is on and listening without jumping through hoops
-pub fn test_device_connection() -> bool {
-    #[cfg(test)]
-    {
-        info!("Skipping device connection test since we're in a test");
-        true
-    }
-
-    #[cfg(not(test))]
-    {
-        use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
-
-        // Connect to lockdownd's socket
-        TcpStream::connect_timeout(
-            &SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(10, 7, 0, 1), 62078)),
-            Duration::from_millis(100),
-        )
-        .is_ok()
-    }
+#[no_mangle]
+/// Frees a string returned by a minimuxer function. **This MUST be called after you are finished using a string returned by another minimuxer function, or it will result in a MEMORY LEAK!!!!**
+pub unsafe extern "C" fn minimuxer_free_string(string_to_free: *const libc::c_char) {
+    let freed = CString::from_raw(string_to_free as *mut libc::c_char);
+    trace!("Freed string: {:?}", freed);
 }
 
 pub trait RustyPlistConversion {

@@ -3,7 +3,7 @@
 use log::{error, info};
 use rusty_libimobiledevice::services::{afc::AfcFileMode, instproxy::InstProxyClient};
 
-use crate::{errors::Errors, fetch_first_device, test_device_connection};
+use crate::{device::fetch_first_device, errors::Errors, test_device_connection};
 
 const PKG_PATH: &str = "PublicStaging";
 

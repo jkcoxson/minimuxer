@@ -204,7 +204,10 @@ fn convert_ip(ip: IpAddr) -> [u8; 152] {
     data
 }
 
+#[cfg(not(test))]
 pub static STARTED: AtomicBool = AtomicBool::new(false);
+#[cfg(test)]
+pub static STARTED: AtomicBool = AtomicBool::new(true); // minimuxer won't start in tests
 
 #[no_mangle]
 /// Starts the muxer and heartbeat client
@@ -284,6 +287,8 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     info!("Logger initialized!!");
 
+    // TODO: compare this with fetch_udid() to ensure we have the correct pairing file, and in SideStore, tell the user if there's a mismatch
+    // we can return Errors::UDIDMismatch
     let udid = match pairing_file.clone().dict_get_item("UDID") {
         Ok(u) => match u.get_string_val() {
             Ok(s) => s,
