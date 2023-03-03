@@ -6,22 +6,22 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rusty_libimobiledevice = { version = "0.1.6", features = ["dynamic"], default-features = false }
-plist_plus = { version = "0.2.*", features = ["dynamic"] }
+rusty_libimobiledevice = { version = "0.1", features = ["dynamic"], default-features = false }
+plist_plus = { version = "0.2", features = ["dynamic"] }
 
-libc = { version = "0.2.132" }
-simplelog = { version = "0.12" }
-log = { version = "*" }
+libc = "0.2"
+simplelog = "0.12"
+log = "*"
 
-reqwest = { version = "0.11.12", features = ["blocking"] }
-serde = { version = "1.0.147" }
-serde_json = { version = "1.0.87" }
-zip = { version = "0.6.3" }
-plist = { version = "1" }
-num_enum = { version = "0.5" }
+reqwest = { version = "0.11", features = ["blocking"] }
+serde = "1.0"
+serde_json = "1.0"
+zip = "0.6"
+plist = "1"
+num_enum = "0"
 
 [build-dependencies]
-cbindgen = "0.20.0"
+cbindgen = "0.20"
 
 [profile.release]
 panic = "abort"
