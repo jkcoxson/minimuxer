@@ -148,3 +148,66 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
         }
     }
 }
+
+#[no_mangle]
+/// Debugs an app from a process ID
+/// # Safety
+/// Don't be stupid
+pub unsafe extern "C" fn minimuxer_attach_debugger(pid: *const libc::c_uint) -> c_int {
+    if pid.is_null() {
+        error!("Process ID is null");
+        return Errors::FunctionArgs.into();
+    }
+
+    let pid = std::ptr::read(pid);
+
+    info!("Debugging process ID: {}", pid);
+
+    if !test_device_connection() {
+        error!("No device connection");
+        return Errors::NoConnection.into();
+    }
+
+    let device = match fetch_first_device(Some(5000)) {
+        Some(d) => d,
+        None => return Errors::NoDevice.into(),
+    };
+
+    let debug_server = match device.new_debug_server("minimuxer") {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Failed to start debug server: {:?}", e);
+            return Errors::CreateDebug.into();
+        }
+    };
+
+    // Taken from JitStreamer: https://github.com/jkcoxson/JitStreamer/blob/master/src/client.rs#L338-L363
+
+    let command = "vAttach;";
+
+    // The PID will consist of 8 hex digits, so we need to pad it with 0s
+    let pid = format!("{:X}", pid);
+    let zeroes = 8 - pid.len();
+    let pid = format!("{}{}", "0".repeat(zeroes), pid);
+    let command = format!("{}{}", command, pid);
+    info!("Sending command: {}", command);
+
+    match debug_server.send_command(command.into()) {
+        Ok(res) => info!("Successfully attached: {:?}", res),
+        Err(e) => {
+            error!("Error attaching: {:?}", e);
+            return Errors::Attach.into();
+        }
+    }
+
+    match debug_server.send_command("D".into()) {
+        Ok(res) => {
+            info!("Success: {:?}", res);
+            Errors::Success.into()
+        }
+        Err(e) => {
+            error!("Error detaching: {:?}", e);
+            Errors::Detach.into()
+        }
+    }
+}

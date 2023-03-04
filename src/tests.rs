@@ -9,6 +9,7 @@ use std::sync::Once;
 use crate::device::{fetch_udid as rust_fetch_udid, minimuxer_fetch_udid};
 use crate::errors::Errors;
 use crate::heartbeat::start_beat;
+use crate::jit::minimuxer_attach_debugger;
 use crate::mounter::minimuxer_auto_mount;
 use crate::provision::minimuxer_remove_provisioning_profiles;
 use crate::{fetch_first_device, minimuxer_free_string, minimuxer_ready};
@@ -129,4 +130,18 @@ make_test!(fetch_udid, {
     println!();
     assert_eq!(rust_udid.as_str(), udid);
     unsafe { minimuxer_free_string(output) };
+});
+
+make_test!(attach_debugger, {
+    let mut pid: libc::c_uint = 0; // Put the PID to attach to here
+    println!();
+    info!("Attaching to {pid}");
+    println!();
+
+    let output = unsafe { minimuxer_attach_debugger(&mut pid as *mut libc::c_uint) };
+    println!();
+    info!(
+        "Got output: Errors::{:?}",
+        Errors::try_from(output).unwrap()
+    );
 });
