@@ -1,6 +1,6 @@
 // Jackson Coxson
 
-use log::{error, info};
+use log::{debug, error, info};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::fetch_first_device;
@@ -17,8 +17,12 @@ pub static DMG_MOUNTED: AtomicBool = AtomicBool::new(false);
 pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
     let c_str = std::ffi::CStr::from_ptr(docs_path);
 
+    #[cfg(not(test))]
     let docs_path = &c_str.to_str().unwrap()[7..];
+    #[cfg(test)]
+    let docs_path = &c_str.to_str().unwrap();
     let dmg_docs_path = format!("{docs_path}/DMG");
+    debug!("DMG path: {dmg_docs_path}");
 
     // This will take a while, especially if the muxer is still waking up
     // Let's move to a new thread

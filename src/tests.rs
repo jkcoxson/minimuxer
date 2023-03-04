@@ -101,9 +101,7 @@ make_test!(ready, {
 
     info!("Starting auto mounter");
     println!();
-    let input = to_c_char(
-        "./target/dmg", /* for some reason this results in ./t/dmg/DMG ?? */
-    );
+    let input = to_c_char("./target/dmg");
     unsafe { minimuxer_auto_mount(input) };
     unsafe { minimuxer_free_string(input) };
     println!();
@@ -112,6 +110,7 @@ make_test!(ready, {
     println!();
     std::thread::sleep(std::time::Duration::from_secs(10));
 
+    println!();
     assert_eq!(unsafe { minimuxer_ready() }, 1);
 });
 
@@ -144,4 +143,5 @@ make_test!(attach_debugger, {
         "Got output: Errors::{:?}",
         Errors::try_from(output).unwrap()
     );
+    assert_eq!(output, 0);
 });
