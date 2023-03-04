@@ -44,7 +44,7 @@ clean:
 
 xcframework: build
 	@echo "xcframework"
-	
+
 	@if [ -d "include" ]; then \
 		echo "cleaning include"; \
         rm -rf include; \
@@ -68,7 +68,7 @@ xcframework: build
 
 xcframework_frameworks: build
 	@echo "xcframework_frameworks"
-	
+
 	@if [ -d "include" ]; then \
 		echo "cleaning include"; \
         rm -rf include; \
@@ -98,7 +98,7 @@ xcframework_frameworks: build
 	@libtool -static \
 		-o target/ios/$(TARGET).framework/$(TARGET) \
 		target/lib$(TARGET)-ios.a
-	
+
 	@cp include/*.* target/sim/$(TARGET).framework/Headers
 	@xcrun \
 		-sdk iphonesimulator \
