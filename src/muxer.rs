@@ -289,7 +289,7 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     // TODO: compare this with fetch_udid() to ensure we have the correct pairing file, and in SideStore, tell the user if there's a mismatch
     // we can return Errors::UDIDMismatch
-    let udid = match pairing_file.clone().dict_get_item("UDID") {
+    let udid = match pairing_file.dict_get_item("UDID") {
         Ok(u) => match u.get_string_val() {
             Ok(s) => s,
             Err(e) => {

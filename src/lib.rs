@@ -58,6 +58,8 @@ pub unsafe extern "C" fn minimuxer_ready() -> libc::c_int {
 
 #[no_mangle]
 /// Frees a string returned by a minimuxer function. **This MUST be called after you are finished using a string returned by another minimuxer function, or it will result in a MEMORY LEAK!!!!**
+/// # Safety
+/// Only use it on a string returned from a minimuxer function. Otherwise, bad things might happen
 pub unsafe extern "C" fn minimuxer_free_string(string_to_free: *const libc::c_char) {
     let freed = CString::from_raw(string_to_free as *mut libc::c_char);
     trace!("Freed string: {:?}", freed);

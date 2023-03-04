@@ -18,7 +18,7 @@ pub fn fetch_first_device(timeout: Option<u16>) -> Option<Device> {
             Err(e) => {
                 if let Some(mut t) = timeout {
                     t -= 10;
-                    if t <= 0 {
+                    if t == 0 {
                         error!("Couldn't fetch first device: {:?}", e);
                         return None;
                     }
@@ -51,10 +51,7 @@ pub fn test_device_connection() -> bool {
 }
 
 pub fn fetch_udid() -> Option<String> {
-    match fetch_first_device(Some(5000)) {
-        Some(d) => Some(d.get_udid()),
-        None => None,
-    }
+    fetch_first_device(Some(5000)).map(|d| d.get_udid())
 }
 
 #[no_mangle]

@@ -186,10 +186,10 @@ pub unsafe extern "C" fn minimuxer_attach_debugger(pid: *const libc::c_uint) -> 
     let command = "vAttach;";
 
     // The PID will consist of 8 hex digits, so we need to pad it with 0s
-    let pid = format!("{:X}", pid);
+    let pid = format!("{pid:X}");
     let zeroes = 8 - pid.len();
     let pid = format!("{}{}", "0".repeat(zeroes), pid);
-    let command = format!("{}{}", command, pid);
+    let command = format!("{command}{pid}");
     info!("Sending command: {}", command);
 
     match debug_server.send_command(command.into()) {
