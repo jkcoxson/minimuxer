@@ -14,7 +14,7 @@ use simplelog::{
     ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
 };
 
-use crate::{errors::Errors, heartbeat::start_beat, raw_packet::RawPacket};
+use crate::{heartbeat::start_beat, raw_packet::RawPacket, Errors};
 
 const LISTEN_PORT: u16 = 27015;
 
@@ -209,57 +209,18 @@ pub static STARTED: AtomicBool = AtomicBool::new(false);
 #[cfg(test)]
 pub static STARTED: AtomicBool = AtomicBool::new(true); // minimuxer won't start in tests
 
-#[no_mangle]
 /// Starts the muxer and heartbeat client
 /// # Arguments
-/// Pairing file as a list of chars and the length
-/// # Safety
-/// Don't be stupid
-pub unsafe extern "C" fn minimuxer_c_start(
-    pairing_file: *mut libc::c_char,
-    log_path: *mut libc::c_char,
-) -> libc::c_int {
+/// Pairing file contents as a string and log path as a string
+pub fn start(pairing_file: String, log_path: String) -> crate::Result<()> {
     if STARTED.load(Ordering::Relaxed) {
         info!("Already started minimuxer, skipping");
-        return Errors::Success.into();
+        return Ok(());
+    } else if std::fs::remove_file(&log_path).is_ok() { // only remove log file on first startup
     }
 
-    if pairing_file.is_null() || log_path.is_null() {
-        println!("\n\nPairing file or log path is null!! Everything is broken!!\n\n");
-        return Errors::FunctionArgs.into();
-    }
-
-    let c_str = std::ffi::CStr::from_ptr(pairing_file);
-
-    let pairing_file = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            println!("\n\nFailed to convert pairing file to string!!\n\n");
-            return Errors::FunctionArgs.into();
-        }
-    }
-    .to_string();
-
-    let pairing_file = match Plist::from_xml(pairing_file) {
-        Ok(p) => p,
-        Err(_) => {
-            println!("\n\nFailed to convert pairing file to plist!!\n\n");
-            return Errors::FunctionArgs.into();
-        }
-    };
-
-    let c_str = std::ffi::CStr::from_ptr(log_path);
-    let log_path = match c_str.to_str() {
-        Ok(l) => format!("{}/minimuxer.log", &l[7..]),
-        Err(_) => {
-            println!("\n\nFailed to convert log path to string!!\n\n");
-            return Errors::FunctionArgs.into();
-        }
-    };
-
-    if std::fs::remove_file(&log_path).is_ok() {}
-
-    match CombinedLogger::init(vec![
+    // the logger failing to initialize isn't a problem since it will only fail if it has already been initialized
+    if CombinedLogger::init(vec![
         TermLogger::new(
             // Allow debug logging for terminal only
             LevelFilter::max(),
@@ -278,14 +239,19 @@ pub unsafe extern "C" fn minimuxer_c_start(
                 .build(),
             File::create(&log_path).unwrap(),
         ),
-    ]) {
-        Ok(_) => {}
-        Err(e) => {
-            println!("\n\nLOGGER FAILED TO INITIALIZE!! WE ARE FLYING BLIND!! Error: {e}\n\n")
-        }
+    ])
+    .is_ok()
+    {
+        info!("Logger initialized!!");
     }
 
-    info!("Logger initialized!!");
+    let pairing_file = match Plist::from_xml(pairing_file) {
+        Ok(p) => p,
+        Err(_) => {
+            error!("Failed to convert pairing file to plist!!");
+            return Err(Errors::PairingFile);
+        }
+    };
 
     // TODO: compare this with fetch_udid() to ensure we have the correct pairing file, and in SideStore, tell the user if there's a mismatch
     // we can return Errors::UDIDMismatch
@@ -294,12 +260,12 @@ pub unsafe extern "C" fn minimuxer_c_start(
             Ok(s) => s,
             Err(e) => {
                 error!("Couldn't convert UDID to string: {:?}", e);
-                return Errors::FunctionArgs.into();
+                return Err(Errors::PairingFile);
             }
         },
         Err(e) => {
             error!("Couldn't get UDID: {:?}", e);
-            return Errors::FunctionArgs.into();
+            return Err(Errors::PairingFile);
         }
     };
 
@@ -308,11 +274,10 @@ pub unsafe extern "C" fn minimuxer_c_start(
 
     info!("minimuxer has started!");
     STARTED.store(true, Ordering::Relaxed);
-    Errors::Success.into()
+    Ok(())
 }
 
-#[no_mangle]
 /// Sets the current environment variable for libusbmuxd to localhost
-pub extern "C" fn target_minimuxer_address() {
-    std::env::set_var("USBMUXD_SOCKET_ADDRESS", "127.0.0.1:27015");
+pub fn target_minimuxer_address() {
+    std::env::set_var("USBMUXD_SOCKET_ADDRESS", format!("127.0.0.1:{LISTEN_PORT}"));
 }

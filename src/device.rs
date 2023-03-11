@@ -1,31 +1,35 @@
-use std::{ffi::CString, sync::atomic::Ordering, time::Duration};
+use std::{sync::atomic::Ordering, time::Duration};
 
 use crate::muxer::STARTED;
 use log::{error, info};
 use rusty_libimobiledevice::idevice::{self, Device};
 
 /// Waits for the muxer to return the device
+///
 /// This ensures that the muxer is running
+///
 /// Returns an error once the timeout expires
-/// # Arguments
-/// * `timeout` - The time to wait in miliseconds
+///
+/// Timeout is 5 seconds, 250 ms sleep between attempts
 /// # Returns
 /// The device
-pub fn fetch_first_device(timeout: Option<u16>) -> Option<Device> {
+pub fn fetch_first_device() -> Option<Device> {
+    const TIMEOUT: u16 = 5000;
+    const SLEEP: u16 = 250;
+
+    let mut t = TIMEOUT;
     loop {
         match idevice::get_first_device() {
             Ok(d) => return Some(d),
             Err(e) => {
-                if let Some(mut t) = timeout {
-                    t -= 10;
-                    if t == 0 {
-                        error!("Couldn't fetch first device: {:?}", e);
-                        return None;
-                    }
+                t -= SLEEP;
+                if t <= 0 {
+                    error!("Couldn't fetch first device: {:?}", e);
+                    return None;
                 }
             }
         }
-        std::thread::sleep(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(SLEEP.into()));
     }
 }
 
@@ -51,32 +55,21 @@ pub fn test_device_connection() -> bool {
 }
 
 pub fn fetch_udid() -> Option<String> {
-    fetch_first_device(Some(5000)).map(|d| d.get_udid())
-}
-
-#[no_mangle]
-/// Returns the UDID of the first device. **It will return an empty string on failure.**
-/// # Safety
-/// **You MUST use `minimuxer_free_string` after you are done using the result, or there will be a MEMORY LEAK!!!!**
-pub unsafe extern "C" fn minimuxer_fetch_udid() -> *const libc::c_char {
     info!("Getting UDID for first device");
 
     if !STARTED.load(Ordering::Relaxed) {
         error!("minimuxer has not started!");
-        let res = CString::new("").unwrap();
-        return res.into_raw();
+        return None;
     }
 
-    match fetch_udid() {
+    match fetch_first_device().map(|d| d.get_udid()) {
         Some(s) => {
             info!("Success: {}", s);
-            let res = CString::new(s).unwrap();
-            res.into_raw()
+            Some(s)
         }
-        None => {
+        _ => {
             error!("Failed to get UDID! Device not connected?");
-            let res = CString::new("").unwrap();
-            res.into_raw()
+            None
         }
     }
 }

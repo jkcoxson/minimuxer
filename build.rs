@@ -1,10 +1,20 @@
-// Jackson Coxson
-use std::env;
+use std::path::PathBuf;
 
 fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    println!("cargo:rerun-if-changed=./build.rs");
 
-    cbindgen::generate(crate_dir)
-        .expect("Unable to generate C bindings")
-        .write_to_file("minimuxer.h");
+    let out_dir = "./generated/";
+    let root = "./src/";
+
+    let bridges: Vec<PathBuf> = std::fs::read_dir(root)
+        .unwrap()
+        .map(|res| res.unwrap().path())
+        .collect();
+    for path in &bridges {
+        let path = path.file_name().unwrap().to_str().unwrap().to_string();
+        println!("cargo:rerun-if-changed={root}{path}");
+    }
+
+    swift_bridge_build::parse_bridges(bridges)
+        .write_all_concatenated(out_dir, env!("CARGO_PKG_NAME"));
 }

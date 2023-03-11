@@ -1,6 +1,6 @@
 /target
 /Cargo.lock
-minimuxer.h
+/generated
 /minimuxer.xcframework
 /minimuxer.xcframework.zip
 /include

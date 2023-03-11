@@ -10,17 +10,10 @@ const VERSIONS_DICTIONARY: &str =
 
 pub static DMG_MOUNTED: AtomicBool = AtomicBool::new(false);
 
-#[no_mangle]
 /// Mount iOS's developer DMG
-/// # Safety
-/// Don't be stupid
-pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
-    let c_str = std::ffi::CStr::from_ptr(docs_path);
-
+pub fn start_auto_mounter(docs_path: String) {
     #[cfg(not(test))]
-    let docs_path = &c_str.to_str().unwrap()[7..];
-    #[cfg(test)]
-    let docs_path = &c_str.to_str().unwrap();
+    let docs_path = docs_path[7..].to_string();
     let dmg_docs_path = format!("{docs_path}/DMG");
     debug!("DMG path: {dmg_docs_path}");
 
@@ -39,7 +32,7 @@ pub unsafe extern "C" fn minimuxer_auto_mount(docs_path: *mut libc::c_char) {
                 info!("Trying to mount dev image");
 
                 // Fetch the device
-                let device = match fetch_first_device(Some(5000)) {
+                let device = match fetch_first_device() {
                     Some(d) => d,
                     None => continue,
                 };
