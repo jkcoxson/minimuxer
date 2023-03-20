@@ -2,9 +2,11 @@
 
 minimuxer is the lockdown muxer used by [SideStore](https://github.com/SideStore/SideStore). It runs on device through [em_proxy](https://github.com/SideStore/em_proxy).
 
+![Alt](https://repobeats.axiom.co/api/embed/95df7af50adae86935e34bc1f59083f1db326c24.svg "Repobeats analytics image")
+
 ## Building
 
-```
+```bash
 make build # builds static libs
 make xcframework # builds an xcframework
 make zip # same as `xcframework`, and zips the final product for upload to GitHub release
@@ -18,7 +20,7 @@ This overwrites the last build on the tag `Build`.
 
 Either push a commit with `[build]` as the prefix for the commit message or push an empty commit with:
 
-```
+```bash
 git commit --allow-empty -m "[build]"
 ```
 
@@ -30,10 +32,22 @@ While minimuxer is built to run on device, it is recommended to test from your c
 [On device](#on-device) for more info)
 
 To test off device, open [tests.rs](src/tests.rs) and use the `make_test` macro to make a test (this ensures logging and other things are initialized). You can then use
-`cargo test <test function name> -- --nocapture` to run it. (`-- --nocapture` allows for logs to be shown, which are essential for debugging and knowing if a test did what it was supposed to do)
+```bash
+cargo test <test function name> -- --nocapture
+```
+to run it. (`-- --nocapture` allows for logs to be shown, which are essential for debugging and knowing if a test did what it was supposed to do)
 
-After implementing your feature, you should also run `cargo clippy --no-deps` to lint your code. If you want some of the lints to auto fix, you can use `cargo clippy --no-deps --fix` (make sure to
-commit your changes beforehand).
+After implementing your feature, you should also run 
+```bash
+cargo clippy --no-deps
+``` 
+to lint your code. 
+
+If you want some of the lints to auto fix, you can use 
+```bash
+cargo clippy --no-deps --fix
+```
+(make sure to commit your changes beforehand).
 
 Note: tests currently don't automatically mount the developer disk image, you must do that yourself with `ideviceimagemounter` or open SideStore on device and let the auto mounter mount it (check
 minimuxer logs in View Error Logs to see if it did so successfully).
