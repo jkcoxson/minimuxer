@@ -62,7 +62,7 @@ fn list_profiles() -> String {
 make_test!(is_ready, {
     info!("Starting heartbeat");
     println!();
-    start_beat(fetch_udid().unwrap());
+    start_beat();
     println!();
 
     info!("Starting auto mounter");

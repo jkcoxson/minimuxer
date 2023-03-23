@@ -1,6 +1,11 @@
 /target
 /Cargo.lock
-/generated
+
 /minimuxer.xcframework
 /minimuxer.xcframework.zip
 /include
+
+/generated.zip
+/generated/*
+!/generated/minimuxer-Bridging-Header.h
+!/generated/minimuxer-helpers.swift

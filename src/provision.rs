@@ -3,13 +3,12 @@
 use log::{error, info};
 use plist_plus::Plist;
 
-use crate::{device::fetch_first_device, test_device_connection, Errors, Result};
+use crate::{device::fetch_first_device, test_device_connection, Errors, Res};
 
 // TODO: take a vec of provisioning profiles and remove old ones like AltServer
 /// Installs a provisioning profile on the device
-/// # Arguments
-/// Bytes of the profile plist
-pub fn install_provisioning_profile(profile: &[u8]) -> Result<()> {
+// pub fn install_provisioning_profile(profile: Vec<&[u8]>, bundle_ids: Vec<String>) -> Result<()> {
+pub fn install_provisioning_profile(profile: &[u8]) -> Res<()> {
     info!("Installing provisioning profile");
 
     if !test_device_connection() {
@@ -47,7 +46,7 @@ pub fn install_provisioning_profile(profile: &[u8]) -> Result<()> {
 /// Removes a provisioning profile
 /// # Arguments
 /// - `id`: Profile UUID
-pub fn remove_provisioning_profile(id: String) -> Result<()> {
+pub fn remove_provisioning_profile(id: String) -> Res<()> {
     info!("Removing profile with ID: {}", id);
 
     if !test_device_connection() {

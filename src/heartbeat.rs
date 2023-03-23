@@ -1,25 +1,26 @@
 // Jackson Coxson
 
 use log::{error, info, warn};
-use rusty_libimobiledevice::idevice;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::device::fetch_first_device;
 
 pub static LAST_BEAT_SUCCESSFUL: AtomicBool = AtomicBool::new(false);
 
-pub fn start_beat(udid: String) {
+pub fn start_beat() {
     std::thread::Builder::new()
         .name("heartbeat".to_string())
         .spawn(move || {
             // Wait for the listen thread to start
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            std::thread::sleep(std::time::Duration::from_millis(100));
             info!("Starting heartbeat thread");
 
             loop {
-                let device = match idevice::get_device(&udid) {
-                    Ok(d) => d,
-                    Err(e) => {
+                let device = match fetch_first_device() {
+                    Some(d) => d,
+                    None => {
                         LAST_BEAT_SUCCESSFUL.store(false, Ordering::Relaxed);
-                        warn!("Could not get device from muxer for heartbeat: {:?}", e);
+                        warn!("Could not get device from muxer for heartbeat");
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         continue;
                     }

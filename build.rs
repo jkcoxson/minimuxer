@@ -17,4 +17,19 @@ fn main() {
 
     swift_bridge_build::parse_bridges(bridges)
         .write_all_concatenated(out_dir, env!("CARGO_PKG_NAME"));
+
+    // move the generated headers/Swift out of the crate directory
+    let crate_dir = format!("{out_dir}{}", env!("CARGO_PKG_NAME"));
+    for path in std::fs::read_dir(&crate_dir).unwrap() {
+        let path = path
+            .unwrap()
+            .path()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        std::fs::rename(format!("{crate_dir}/{path}"), format!("{out_dir}{path}")).unwrap();
+    }
+    std::fs::remove_dir(crate_dir).unwrap();
 }

@@ -5,6 +5,8 @@ use std::{io::Cursor, sync::atomic::Ordering};
 use log::info;
 use plist::{Error, Value};
 use plist_plus::Plist;
+use plist_plus::error::PlistError;
+use serde::Serialize;
 
 use crate::device::fetch_first_device;
 use crate::heartbeat::LAST_BEAT_SUCCESSFUL;
@@ -33,11 +35,19 @@ use crate::provision::{install_provisioning_profile, remove_provisioning_profile
 #[swift_bridge::bridge]
 mod ffi {
     // TODO: give arguments to most errors with exact error message as string (for example, ApplicationVerificationFailed as String passed to InstallApp)
+    // TODO: use debugDescription for unknown error
     #[derive(Debug)]
     enum Errors {
         NoDevice,
+        NoConnection,
+        PairingFile,
+        // TODO: use this in minimuxer_c_start
+        UDIDMismatch,
+
         CreateDebug,
         CreateInstproxy,
+
+        /* jit */
         LookupApps,
         FindApp,
         BundlePath,
@@ -46,18 +56,18 @@ mod ffi {
         Argv,
         LaunchSuccess,
         Detach,
+        Attach,
+
+        /* install */
         CreateAfc,
         RwAfc,
         InstallApp,
         UninstallApp,
+
+        /* provision */
         CreateMisagent,
         ProfileInstall,
         ProfileRemove,
-        NoConnection,
-        Attach,
-        PairingFile,
-        // TODO: use this in minimuxer_c_start
-        //UDIDMismatch,
     }
 
     extern "Rust" {
@@ -93,7 +103,7 @@ pub use ffi::Errors; // export transparent Errors enum for other modules to use
 /// utility Result to always use an Errors as Err type
 ///
 /// unfortunately we can't use this type when exporting methods to swift-bridge/ffi for unknown reasons
-pub type Result<T> = std::result::Result<T, Errors>;
+pub type Res<T> = Result<T, Errors>;
 
 /// Returns `false` if minimuxer is not ready, `true` if it is. Ready means:
 /// - device connection succeeded
@@ -126,28 +136,36 @@ pub fn ready() -> bool {
 
 pub trait RustyPlistConversion {
     /// Converts the bytes to a rusty plist Value.
-    fn from_bytes(bytes: &[u8]) -> std::result::Result<Value, Error>;
+    fn from_bytes(bytes: &[u8]) -> Result<Value, Error>;
 
     /// Converts a plist_plus Plist to a rusty plist Value.
-    ///
-    /// Note: this method converts the Plist to a string,
-    /// and then to bytes to then pass to bytes_to_plist.
-    /// Turning the Plist into a string was the best method
-    /// of getting raw data I could find.
-    /// It hasn't been properly tested; it might not work
-    /// with binary plists, or with similar edge cases.
-    /// (it should work with binary plists since
-    /// Plist.to_string() outputs the entire plist as
-    /// a string, which would already be converted by plist_plus.)
-    fn from_plist_plus(plist: Plist) -> std::result::Result<Value, Error>;
+    fn from_plist_plus(plist: Plist) -> Result<Value, Error>;
 }
 
 impl RustyPlistConversion for Value {
-    fn from_bytes(bytes: &[u8]) -> std::result::Result<Value, Error> {
+    fn from_bytes(bytes: &[u8]) -> Result<Value, Error> {
         Value::from_reader(Cursor::new(bytes))
     }
 
-    fn from_plist_plus(plist: Plist) -> std::result::Result<Value, Error> {
+    fn from_plist_plus(plist: Plist) -> Result<Value, Error> {
         Value::from_bytes(plist.to_string().as_bytes())
     }
+}
+
+pub trait PlistPlusConversion {
+    /// Converts a plist_plus Plist to a rusty plist Value.
+    fn from_rusty_plist(plist: &Value) -> Result<Plist, PlistError>;
+}
+
+impl PlistPlusConversion for Plist {
+    fn from_rusty_plist(plist: &Value) -> Result<Plist, PlistError> {
+        Plist::from_memory(plist_to_bytes(plist))
+    }
+}
+
+/// Converts a rusty plist Value to bytes in XML format. Panics on failure (but it shouldn't fail, if it does it's most likely your fault)
+pub fn plist_to_bytes<P: Serialize>(plist: &P) -> Vec<u8> {
+    let mut bytes = vec![];
+    plist::to_writer_xml(&mut bytes, plist).unwrap();
+    bytes
 }

@@ -13,7 +13,7 @@ pub static DMG_MOUNTED: AtomicBool = AtomicBool::new(false);
 /// Mount iOS's developer DMG
 pub fn start_auto_mounter(docs_path: String) {
     #[cfg(not(test))]
-    let docs_path = docs_path[7..].to_string();
+    let docs_path = docs_path[7..].to_string(); // remove the file:// prefix
     let dmg_docs_path = format!("{docs_path}/DMG");
     debug!("DMG path: {dmg_docs_path}");
 

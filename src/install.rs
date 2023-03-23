@@ -1,14 +1,16 @@
 // Jackson Coxson
 
 use log::{error, info};
-use rusty_libimobiledevice::services::{afc::AfcFileMode, instproxy::InstProxyClient};
+use plist::{Dictionary, Value};
+use plist_plus::Plist;
+use rusty_libimobiledevice::services::afc::AfcFileMode;
 
-use crate::{device::fetch_first_device, test_device_connection, Errors, Result};
+use crate::{device::fetch_first_device, test_device_connection, Errors, PlistPlusConversion, Res};
 
 const PKG_PATH: &str = "PublicStaging";
 
 /// Yeets an ipa to the afc jail
-pub fn yeet_app_afc(bundle_id: String, ipa_bytes: &[u8]) -> Result<()> {
+pub fn yeet_app_afc(bundle_id: String, ipa_bytes: &[u8]) -> Res<()> {
     info!("Yeeting IPA for bundle ID: {}", bundle_id);
 
     if !test_device_connection() {
@@ -95,7 +97,7 @@ pub fn yeet_app_afc(bundle_id: String, ipa_bytes: &[u8]) -> Result<()> {
 
 /// Installs an ipa with a bundle ID
 /// Expects the ipa to be in the afc jail from yeet_app_afc
-pub fn install_ipa(bundle_id: String) -> Result<()> {
+pub fn install_ipa(bundle_id: String) -> Res<()> {
     info!("Installing app for bundle ID: {}", bundle_id);
 
     if !test_device_connection() {
@@ -108,10 +110,11 @@ pub fn install_ipa(bundle_id: String) -> Result<()> {
         None => return Err(Errors::NoDevice),
     };
 
-    let mut client_opts = InstProxyClient::client_options_new();
-    client_opts
-        .dict_set_item("CFBundleIdentifier", bundle_id.clone().into())
-        .unwrap();
+    // normally, we use client_options_new: https://github.com/jkcoxson/rusty_libimobiledevice/blob/master/src/services/instproxy.rs#L123
+    // however, this literally just creates an empty dictionary: https://github.com/libimobiledevice/libimobiledevice/blob/master/src/installation_proxy.c#L919-L922
+    // using this caused libplist to crash, no idea why, so I ported it to rusty plist
+    let mut client_opts = Dictionary::new();
+    client_opts.insert("CFBundleIdentifier".into(), bundle_id.clone().into());
 
     let inst_client = match device.new_instproxy_client("ideviceinstaller") {
         Ok(i) => i,
@@ -124,7 +127,7 @@ pub fn install_ipa(bundle_id: String) -> Result<()> {
     info!("Installing");
     match inst_client.install(
         format!("./{PKG_PATH}/{bundle_id}/app.ipa"),
-        Some(client_opts.clone()), // nobody understands libplist, but clone is necessary I guess
+        Some(Plist::from_rusty_plist(&Value::Dictionary(client_opts)).unwrap()),
     ) {
         Ok(_) => {
             info!("Done!");
@@ -138,7 +141,7 @@ pub fn install_ipa(bundle_id: String) -> Result<()> {
 }
 
 /// Removes an app from the device
-pub fn remove_app(bundle_id: String) -> Result<()> {
+pub fn remove_app(bundle_id: String) -> Res<()> {
     info!("Removing app for {}", bundle_id);
 
     if !test_device_connection() {

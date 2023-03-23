@@ -4,10 +4,10 @@ use log::{debug, error, info};
 use plist_plus::Plist;
 use rusty_libimobiledevice::services::instproxy::InstProxyClient;
 
-use crate::{device::fetch_first_device, test_device_connection, Errors, Result};
+use crate::{device::fetch_first_device, test_device_connection, Errors, Res};
 
 /// Debugs an app from an app ID
-pub fn debug_app(app_id: String) -> Result<()> {
+pub fn debug_app(app_id: String) -> Res<()> {
     info!("Debugging app ID: {}", app_id);
 
     if !test_device_connection() {
@@ -132,7 +132,7 @@ pub fn debug_app(app_id: String) -> Result<()> {
 /// Debugs an app from a process ID
 /// # Arguments
 /// - `pid`: Process ID. `attach_debugger` will automatically turn this into the format required by DebugServer.
-pub fn attach_debugger(pid: u32) -> Result<()> {
+pub fn attach_debugger(pid: u32) -> Res<()> {
     info!("Debugging process ID: {}", pid);
 
     if !test_device_connection() {

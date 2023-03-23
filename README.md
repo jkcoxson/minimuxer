@@ -79,12 +79,12 @@ Once you've made your function, added it to the tests and verified that it works
 When making your function, you might have something similar to this:
 
 ```rs
-pub fn install_provisioning_profile(profile: Vec<u8>) -> Result<()> { ... }
+pub fn install_provisioning_profile(profile: &[u8]) -> Result<()> { ... }
 ```
 
-You can `use crate::Result` as a shorthand to `Result<T, crate::Errors>`. (Most files already `use` this)
+You can `use crate::Res` as a shorthand to `Result<T, crate::Errors>`. (Most files already `use` this)
 
-When exposing your function to the `ffi` module, we unfortunately can't use the `crate::Result` type alias. Instead, do this:
+When exposing your function to the `ffi` module, we unfortunately can't use the `crate::Res` type alias. Instead, do this:
 `Result<[the type your function returns. in the case of install_provisioning_profile, it is ()], Errors>`
 
 ### `minimuxer_install_provisioning_profile`
