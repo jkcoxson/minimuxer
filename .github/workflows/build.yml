@@ -46,7 +46,7 @@ jobs:
         tag: "build"
         files: |
           minimuxer.xcframework.zip
-          minimuxer.h
+          generated.zip
           target/libminimuxer.a
           target/libminimuxer-sim.a
         body: |
