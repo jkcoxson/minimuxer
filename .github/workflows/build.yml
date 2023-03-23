@@ -35,9 +35,6 @@ jobs:
     - name: Build
       run: make zip
 
-    - name: Copy libminimuxer-ios.a to old name
-      run: cp target/libminimuxer-ios.a target/libminimuxer.a
-
     - name: Upload to release
       uses: IsaacShelton/update-existing-release@v1.3.1
       with:
@@ -47,7 +44,7 @@ jobs:
         files: |
           minimuxer.xcframework.zip
           generated.zip
-          target/libminimuxer.a
+          target/libminimuxer-ios.a
           target/libminimuxer-sim.a
         body: |
           Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
