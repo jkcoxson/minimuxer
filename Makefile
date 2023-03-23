@@ -68,7 +68,7 @@ xcframework: build
     fi
 	@mkdir include
 	@mkdir include/$(TARGET)/
-	@cp $(TARGET).h include/$(TARGET)/
+	@cp generated/$(TARGET).h include/$(TARGET)/
 	@cp module.modulemap include/$(TARGET)/
 
 	@if [ -d "$(TARGET).xcframework" ]; then \
