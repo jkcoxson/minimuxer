@@ -143,4 +143,4 @@ zip: xcframework
 	zip -r $(TARGET).xcframework.zip $(TARGET).xcframework
 
 	@echo "zip generated"
-	@zip -r generated/ generated.zip
+	@zip -r generated.zip generated/
