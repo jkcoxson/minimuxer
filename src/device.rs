@@ -32,7 +32,7 @@ pub fn fetch_first_device() -> Res<Device> {
             Ok(d) => return Ok(d),
             Err(e) => {
                 t -= SLEEP;
-                if t <= 0 {
+                if t == 0 {
                     error!("Couldn't fetch first device: {:?}", e);
                     return Err(Errors::NoDevice);
                 }

@@ -62,9 +62,9 @@ fn main() {
                 // sometimes swift-bridge won't add a newline after defintions
                 .replace(";typedef", ";\ntypedef");
             let mut output: Vec<String> = vec![];
-            for line in input.split("\n") {
+            for line in input.split('\n') {
                 let line = line.to_owned();
-                if !output.contains(&line) || line.len() <= 0 || line.starts_with("//") {
+                if !output.contains(&line) || line.is_empty() || line.starts_with("//") {
                     output.push(line);
                 }
             }

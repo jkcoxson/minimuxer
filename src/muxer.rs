@@ -265,7 +265,7 @@ pub static STARTED: AtomicBool = AtomicBool::new(true); // minimuxer won't start
 /// # Arguments
 /// Pairing file contents as a string and log path as a string
 pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
-    let log_path = format!("{}/minimuxer.log", log_path[7..].to_string()); // remove the file:// prefix
+    let log_path = format!("{}/minimuxer.log", &log_path[7..]); // remove the file:// prefix
 
     if STARTED.load(Ordering::Relaxed) {
         info!("Already started minimuxer, skipping");

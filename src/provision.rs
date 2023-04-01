@@ -17,7 +17,7 @@ mod ffi {
     extern "Rust" {
         fn install_provisioning_profile(profile: &[u8]) -> Result<(), Errors>;
         fn remove_provisioning_profile(id: String) -> Result<(), Errors>;
-        fn dump_profiles() -> Result<(), Errors>;
+        fn dump_profiles(docs_path: String) -> Result<(), Errors>;
     }
 }
 
@@ -42,7 +42,7 @@ pub fn install_provisioning_profile(profile: &[u8]) -> Res<()> {
         }
     };
 
-    let plist = Plist::new_data(&profile);
+    let plist = Plist::new_data(profile);
 
     match mis_client.install(plist) {
         Ok(_) => {
