@@ -28,7 +28,7 @@ else
 endif
 
 # TODO: remove/update once SPM gets merged
-copy:
+copy: build
 	@echo "SIDESTORE_REPO: $(SIDESTORE_REPO)"
 
 	@echo "copying libraries"
@@ -68,16 +68,17 @@ xcframework: build
     fi
 	@mkdir include
 	@mkdir include/$(TARGET)/
-	@cp generated/$(TARGET).h include/$(TARGET)/
+	@cp generated/*.h include/$(TARGET)/
 	@cp module.modulemap include/$(TARGET)/
 
 	@if [ -d "$(TARGET).xcframework" ]; then \
 		echo "cleaning $(TARGET).xcframework"; \
 	    rm -rf $(TARGET).xcframework; \
 	fi
+
 	@xcodebuild \
 			-create-xcframework \
-			-library target/aarch64-apple-ios/release/lib$(TARGET).a \
+			-library target/lib$(TARGET)-ios.a \
 			-headers include/ \
 			-library target/lib$(TARGET)-sim.a \
 			-headers include/ \
@@ -92,7 +93,7 @@ xcframework_frameworks: build
     fi
 	@mkdir include
 	@mkdir include/$(TARGET)
-	@cp generated/$(TARGET).h include/$(TARGET)
+	@cp generated/*.h include/$(TARGET)
 	@cp module.modulemap include/$(TARGET)
 
 	@if [ -d "target/ios" ]; then \

@@ -5,6 +5,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::fetch_first_device;
 
+#[swift_bridge::bridge]
+mod ffi {
+    #[swift_bridge(already_declared, swift_name = "MinimuxerError")]
+    enum Errors {}
+
+    extern "Rust" {
+        fn start_auto_mounter(docs_path: String);
+    }
+}
+
 const VERSIONS_DICTIONARY: &str =
     "https://raw.githubusercontent.com/jkcoxson/JitStreamer/master/versions.json";
 
@@ -33,8 +43,8 @@ pub fn start_auto_mounter(docs_path: String) {
 
                 // Fetch the device
                 let device = match fetch_first_device() {
-                    Some(d) => d,
-                    None => continue,
+                    Ok(d) => d,
+                    _ => continue,
                 };
 
                 // Start an image mounter service

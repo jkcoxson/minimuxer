@@ -5,7 +5,22 @@ use plist::{Dictionary, Value};
 use plist_plus::Plist;
 use rusty_libimobiledevice::services::afc::AfcFileMode;
 
-use crate::{device::fetch_first_device, test_device_connection, Errors, PlistPlusConversion, Res};
+use crate::{
+    device::{fetch_first_device, test_device_connection},
+    Errors, PlistPlusConversion, Res,
+};
+
+#[swift_bridge::bridge]
+mod ffi {
+    #[swift_bridge(already_declared, swift_name = "MinimuxerError")]
+    enum Errors {}
+
+    extern "Rust" {
+        fn yeet_app_afc(bundle_id: String, ipa_bytes: &[u8]) -> Result<(), Errors>;
+        fn install_ipa(bundle_id: String) -> Result<(), Errors>;
+        fn remove_app(bundle_id: String) -> Result<(), Errors>;
+    }
+}
 
 const PKG_PATH: &str = "PublicStaging";
 
@@ -18,10 +33,7 @@ pub fn yeet_app_afc(bundle_id: String, ipa_bytes: &[u8]) -> Res<()> {
         return Err(Errors::NoConnection);
     }
 
-    let device = match fetch_first_device() {
-        Some(d) => d,
-        None => return Err(Errors::NoDevice),
-    };
+    let device = fetch_first_device()?;
 
     // Start an AFC client
     let afc = match device.new_afc_client("minimuxer") {
@@ -105,10 +117,7 @@ pub fn install_ipa(bundle_id: String) -> Res<()> {
         return Err(Errors::NoConnection);
     }
 
-    let device = match fetch_first_device() {
-        Some(d) => d,
-        None => return Err(Errors::NoDevice),
-    };
+    let device = fetch_first_device()?;
 
     // normally, we use client_options_new: https://github.com/jkcoxson/rusty_libimobiledevice/blob/master/src/services/instproxy.rs#L123
     // however, this literally just creates an empty dictionary: https://github.com/libimobiledevice/libimobiledevice/blob/master/src/installation_proxy.c#L919-L922
@@ -149,10 +158,7 @@ pub fn remove_app(bundle_id: String) -> Res<()> {
         return Err(Errors::NoConnection);
     }
 
-    let device = match fetch_first_device() {
-        Some(d) => d,
-        None => return Err(Errors::NoDevice),
-    };
+    let device = fetch_first_device()?;
 
     let instproxy_client = match device.new_instproxy_client("minimuxer-remove-app") {
         Ok(i) => i,

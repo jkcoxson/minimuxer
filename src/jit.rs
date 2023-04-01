@@ -4,7 +4,21 @@ use log::{debug, error, info};
 use plist_plus::Plist;
 use rusty_libimobiledevice::services::instproxy::InstProxyClient;
 
-use crate::{device::fetch_first_device, test_device_connection, Errors, Res};
+use crate::{
+    device::{fetch_first_device, test_device_connection},
+    Errors, Res,
+};
+
+#[swift_bridge::bridge]
+mod ffi {
+    #[swift_bridge(already_declared, swift_name = "MinimuxerError")]
+    enum Errors {}
+
+    extern "Rust" {
+        fn debug_app(app_id: String) -> Result<(), Errors>;
+        fn attach_debugger(pid: u32) -> Result<(), Errors>;
+    }
+}
 
 /// Debugs an app from an app ID
 pub fn debug_app(app_id: String) -> Res<()> {
@@ -15,10 +29,7 @@ pub fn debug_app(app_id: String) -> Res<()> {
         return Err(Errors::NoConnection);
     }
 
-    let device = match fetch_first_device() {
-        Some(d) => d,
-        None => return Err(Errors::NoDevice),
-    };
+    let device = fetch_first_device()?;
 
     let debug_server = match device.new_debug_server("minimuxer") {
         Ok(d) => d,
@@ -140,10 +151,7 @@ pub fn attach_debugger(pid: u32) -> Res<()> {
         return Err(Errors::NoConnection);
     }
 
-    let device = match fetch_first_device() {
-        Some(d) => d,
-        None => return Err(Errors::NoDevice),
-    };
+    let device = fetch_first_device()?;
 
     let debug_server = match device.new_debug_server("minimuxer") {
         Ok(d) => d,

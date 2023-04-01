@@ -4,11 +4,13 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::sync::Once;
 
+use crate::afc_file_manager::AfcFileManager;
 use crate::device::fetch_udid;
 use crate::heartbeat::start_beat;
 use crate::jit::attach_debugger;
 use crate::mounter::start_auto_mounter;
-use crate::ready;
+use crate::provision::dump_profiles;
+use crate::{ready, set_debug};
 
 /* Utils */
 
@@ -16,6 +18,8 @@ fn init() {
     static INIT: Once = Once::new();
 
     INIT.call_once(|| {
+        set_debug(true);
+
         TermLogger::init(
             // Allow debug logging
             LevelFilter::max(),
@@ -95,4 +99,22 @@ make_test!(jit_pid, {
     println!();
     info!("Got output: {:?}", output);
     assert!(matches!(output, Ok(())));
+});
+
+make_test!(afc_file_manager, {
+    dbg!(AfcFileManager::contents_of("PublicStaging".to_string()).unwrap());
+    dbg!(AfcFileManager::write_file(
+        "/hello_apple".to_string(),
+        std::fs::read("./README.md").unwrap().as_slice(),
+    )
+    .unwrap());
+    dbg!(AfcFileManager::copy_file_outside_afc(
+        "/hello_apple".to_string(),
+        "./target/hello".to_string()
+    )
+    .unwrap());
+});
+
+make_test!(dump_profiles_, {
+    dump_profiles("./target".to_string()).unwrap();
 });

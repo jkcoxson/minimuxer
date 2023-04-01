@@ -4,45 +4,37 @@ use std::{io::Cursor, sync::atomic::Ordering};
 
 use log::info;
 use plist::{Error, Value};
-use plist_plus::Plist;
 use plist_plus::error::PlistError;
+use plist_plus::Plist;
 use serde::Serialize;
 
-use crate::device::fetch_first_device;
+use crate::device::{fetch_first_device, test_device_connection};
 use crate::heartbeat::LAST_BEAT_SUCCESSFUL;
 use crate::mounter::DMG_MOUNTED;
 use crate::muxer::STARTED;
 
-pub mod device;
+mod afc_file_manager;
+mod device;
 mod heartbeat;
-pub mod install;
-pub mod jit;
-pub mod mounter;
-pub mod muxer;
-pub mod provision;
+mod install;
+mod jit;
+mod mounter;
+mod muxer;
+mod provision;
 mod raw_packet;
 #[cfg(test)]
 mod tests;
-
-/* ffi imports - these are used when exporting ffi functions to swift-bridge */
-use crate::device::{fetch_udid, test_device_connection};
-use crate::install::{install_ipa, remove_app, yeet_app_afc};
-use crate::jit::{attach_debugger, debug_app};
-use crate::mounter::start_auto_mounter;
-use crate::muxer::{start, target_minimuxer_address};
-use crate::provision::{install_provisioning_profile, remove_provisioning_profile};
 
 #[swift_bridge::bridge]
 mod ffi {
     // TODO: give arguments to most errors with exact error message as string (for example, ApplicationVerificationFailed as String passed to InstallApp)
     // TODO: use debugDescription for unknown error
     #[derive(Debug)]
+    #[swift_bridge(swift_name = "MinimuxerError")]
     enum Errors {
         NoDevice,
         NoConnection,
         PairingFile,
-        // TODO: use this in minimuxer_c_start
-        UDIDMismatch,
 
         CreateDebug,
         CreateInstproxy,
@@ -72,38 +64,15 @@ mod ffi {
 
     extern "Rust" {
         fn ready() -> bool;
-
-        /* device */
-        fn fetch_udid() -> Option<String>;
-        fn test_device_connection() -> bool;
-
-        /* install */
-        fn yeet_app_afc(bundle_id: String, ipa_bytes: &[u8]) -> Result<(), Errors>;
-        fn install_ipa(bundle_id: String) -> Result<(), Errors>;
-        fn remove_app(bundle_id: String) -> Result<(), Errors>;
-
-        /* jit */
-        fn attach_debugger(pid: u32) -> Result<(), Errors>;
-        fn debug_app(app_id: String) -> Result<(), Errors>;
-
-        /* mounter */
-        fn start_auto_mounter(docs_path: String);
-
-        /* muxer */
-        fn start(pairing_file: String, log_path: String) -> Result<(), Errors>;
-        fn target_minimuxer_address();
-
-        /* provision */
-        fn install_provisioning_profile(profile: &[u8]) -> Result<(), Errors>;
-        fn remove_provisioning_profile(id: String) -> Result<(), Errors>;
+        fn set_debug(debug: bool);
     }
 }
-pub use ffi::Errors; // export transparent Errors enum for other modules to use
+pub(crate) use ffi::Errors; // export transparent Errors enum for other modules to use
 
 /// utility Result to always use an Errors as Err type
 ///
 /// unfortunately we can't use this type when exporting methods to swift-bridge/ffi for unknown reasons
-pub type Res<T> = Result<T, Errors>;
+pub(crate) type Res<T> = Result<T, Errors>;
 
 /// Returns `false` if minimuxer is not ready, `true` if it is. Ready means:
 /// - device connection succeeded
@@ -111,9 +80,9 @@ pub type Res<T> = Result<T, Errors>;
 /// - last heartbeat was a success
 /// - the developer disk image is mounted
 /// - `start` has been called and it was successful
-pub fn ready() -> bool {
+fn ready() -> bool {
     let device_connection = test_device_connection();
-    let device_exists = fetch_first_device().is_some();
+    let device_exists = fetch_first_device().is_ok();
     let heartbeat_success = LAST_BEAT_SUCCESSFUL.load(Ordering::Relaxed);
     let dmg_mounted = DMG_MOUNTED.load(Ordering::Relaxed);
     let started = STARTED.load(Ordering::Relaxed);
@@ -134,7 +103,24 @@ pub fn ready() -> bool {
     true
 }
 
-pub trait RustyPlistConversion {
+extern "C" {
+    fn libusbmuxd_set_debug_level(level: i32);
+    fn idevice_set_debug_level(level: i32);
+}
+
+/// Enables or disables libimobiledevice and libusbmuxd debug logging
+fn set_debug(debug: bool) {
+    let level = match debug {
+        true => 1,
+        false => 0,
+    };
+    unsafe {
+        libusbmuxd_set_debug_level(level);
+        idevice_set_debug_level(level);
+    }
+}
+
+pub(crate) trait RustyPlistConversion {
     /// Converts the bytes to a rusty plist Value.
     fn from_bytes(bytes: &[u8]) -> Result<Value, Error>;
 
@@ -152,7 +138,7 @@ impl RustyPlistConversion for Value {
     }
 }
 
-pub trait PlistPlusConversion {
+pub(crate) trait PlistPlusConversion {
     /// Converts a plist_plus Plist to a rusty plist Value.
     fn from_rusty_plist(plist: &Value) -> Result<Plist, PlistError>;
 }
@@ -164,7 +150,7 @@ impl PlistPlusConversion for Plist {
 }
 
 /// Converts a rusty plist Value to bytes in XML format. Panics on failure (but it shouldn't fail, if it does it's most likely your fault)
-pub fn plist_to_bytes<P: Serialize>(plist: &P) -> Vec<u8> {
+pub(crate) fn plist_to_bytes<P: Serialize>(plist: &P) -> Vec<u8> {
     let mut bytes = vec![];
     plist::to_writer_xml(&mut bytes, plist).unwrap();
     bytes

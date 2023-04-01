@@ -1,8 +1,19 @@
 use std::{sync::atomic::Ordering, time::Duration};
 
-use crate::muxer::STARTED;
+use crate::{muxer::STARTED, Errors, Res};
 use log::{error, info};
 use rusty_libimobiledevice::idevice::{self, Device};
+
+#[swift_bridge::bridge]
+mod ffi {
+    #[swift_bridge(already_declared, swift_name = "MinimuxerError")]
+    enum Errors {}
+
+    extern "Rust" {
+        fn fetch_udid() -> Option<String>;
+        fn test_device_connection() -> bool;
+    }
+}
 
 /// Waits for the muxer to return the device
 ///
@@ -11,21 +22,19 @@ use rusty_libimobiledevice::idevice::{self, Device};
 /// Returns an error once the timeout expires
 ///
 /// Timeout is 5 seconds, 250 ms sleep between attempts
-/// # Returns
-/// The device
-pub fn fetch_first_device() -> Option<Device> {
+pub fn fetch_first_device() -> Res<Device> {
     const TIMEOUT: u16 = 5000;
     const SLEEP: u16 = 250;
 
     let mut t = TIMEOUT;
     loop {
         match idevice::get_first_device() {
-            Ok(d) => return Some(d),
+            Ok(d) => return Ok(d),
             Err(e) => {
                 t -= SLEEP;
                 if t <= 0 {
                     error!("Couldn't fetch first device: {:?}", e);
-                    return None;
+                    return Err(Errors::NoDevice);
                 }
             }
         }
@@ -63,7 +72,7 @@ pub fn fetch_udid() -> Option<String> {
     }
 
     match fetch_first_device().map(|d| d.get_udid()) {
-        Some(s) => {
+        Ok(s) => {
             info!("Success: {}", s);
             Some(s)
         }

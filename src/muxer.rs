@@ -10,18 +10,24 @@ use std::{
 
 use log::{error, info, trace, warn, LevelFilter};
 use plist::{Dictionary, Value};
-use rusty_libimobiledevice::idevice;
 use simplelog::{
     ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
 };
 
 use crate::{heartbeat::start_beat, plist_to_bytes, raw_packet::RawPacket, Errors};
 
-const LISTEN_PORT: u16 = 27015;
+#[swift_bridge::bridge]
+mod ffi {
+    #[swift_bridge(already_declared, swift_name = "MinimuxerError")]
+    enum Errors {}
 
-extern "C" {
-    fn libusbmuxd_set_debug_level(level: i32);
+    extern "Rust" {
+        fn start(pairing_file: String, log_path: String) -> Result<(), Errors>;
+        fn target_minimuxer_address();
+    }
 }
+
+const LISTEN_PORT: u16 = 27015;
 
 pub fn listen(pairing_file: Dictionary) {
     std::thread::Builder::new()
@@ -267,10 +273,6 @@ pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
     } else if std::fs::remove_file(&log_path).is_ok() { // only remove log file on first startup
     }
 
-    // Enable libimobiledevice debug logging
-    idevice::set_debug(true); // this can be very verbose (logs all plists it sends to the device)
-    unsafe { libusbmuxd_set_debug_level(1) };
-
     // the logger failing to initialize isn't a problem since it will only fail if it has already been initialized
     if CombinedLogger::init(vec![
         TermLogger::new(
@@ -305,11 +307,9 @@ pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
         }
     };
 
-    // TODO: compare this with fetch_udid() to ensure we have the correct pairing file, and in SideStore, tell the user if there's a mismatch
-    // we can return Errors::UDIDMismatch
-    let _udid = match pairing_file.get("UDID") {
+    match pairing_file.get("UDID") {
         Some(u) => match u.as_string() {
-            Some(s) => s.to_owned(),
+            Some(_) => {}
             None => {
                 error!("Couldn't convert UDID to string");
                 return Err(Errors::PairingFile);

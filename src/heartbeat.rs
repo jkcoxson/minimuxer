@@ -17,8 +17,8 @@ pub fn start_beat() {
 
             loop {
                 let device = match fetch_first_device() {
-                    Some(d) => d,
-                    None => {
+                    Ok(d) => d,
+                    _ => {
                         LAST_BEAT_SUCCESSFUL.store(false, Ordering::Relaxed);
                         warn!("Could not get device from muxer for heartbeat");
                         std::thread::sleep(std::time::Duration::from_millis(100));
