@@ -17,7 +17,7 @@ mod ffi {
     extern "Rust" {
         fn install_provisioning_profile(profile: &[u8]) -> Result<(), Errors>;
         fn remove_provisioning_profile(id: String) -> Result<(), Errors>;
-        fn dump_profiles(docs_path: String) -> Result<(), Errors>;
+        fn dump_profiles(docs_path: String) -> Result<String, Errors>;
     }
 }
 
@@ -89,7 +89,7 @@ pub fn remove_provisioning_profile(id: String) -> Res<()> {
     }
 }
 
-pub fn dump_profiles(docs_path: String) -> Res<()> {
+pub fn dump_profiles(docs_path: String) -> Res<String> {
     info!("Dumping profiles");
 
     if !test_device_connection() {
@@ -207,5 +207,5 @@ pub fn dump_profiles(docs_path: String) -> Res<()> {
     }
 
     info!("Success");
-    Ok(())
+    Ok(dump_dir)
 }
