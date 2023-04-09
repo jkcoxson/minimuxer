@@ -21,12 +21,43 @@ mod ffi {
         fn write_file(to: String, bytes: &[u8]) -> Result<(), Errors>;
         #[swift_bridge(swift_name = "copyFileOutsideAfc", associated_to = AfcFileManager)]
         fn copy_file_outside_afc(from: String, to: String) -> Result<(), Errors>;
-        #[swift_bridge(swift_name = "fileSize", associated_to = AfcFileManager)]
-        fn file_size(path: String) -> Result<u32, Errors>;
-        #[swift_bridge(swift_name = "contentsOf", associated_to = AfcFileManager)]
-        // for some reason we can't return Result<Vec<String>, Error> but Option works fine
-        // the reason why we don't want to use Option for everything is that it's easier to use Result with an FallibleAsyncButton
-        fn contents_of(directory_path: String) -> Option<Vec<String>>;
+        #[swift_bridge(swift_name = "contents", associated_to = AfcFileManager)]
+        fn contents() -> Vec<RustDirectoryEntry>;
+
+        type RustDirectoryEntry;
+        fn path(self: &RustDirectoryEntry) -> String;
+        fn parent(self: &RustDirectoryEntry) -> String;
+        #[swift_bridge(swift_name = "isFile")]
+        fn is_file(self: &RustDirectoryEntry) -> bool;
+        fn size(self: &RustDirectoryEntry) -> Option<u32>;
+        fn children(self: &RustDirectoryEntry) -> Vec<RustDirectoryEntry>;
+    }
+}
+
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone)]
+pub struct RustDirectoryEntry {
+    path: String,
+    parent: String,
+    is_file: bool,
+    size: Option<u32>,
+    children: Vec<RustDirectoryEntry>,
+}
+impl RustDirectoryEntry {
+    pub fn path(&self) -> String {
+        self.path.clone()
+    }
+    pub fn parent(&self) -> String {
+        self.parent.clone()
+    }
+    pub fn is_file(&self) -> bool {
+        self.is_file
+    }
+    pub fn size(&self) -> Option<u32> {
+        self.size
+    }
+    pub fn children(&self) -> Vec<RustDirectoryEntry> {
+        self.children.clone()
     }
 }
 
@@ -162,7 +193,7 @@ impl AfcFileManager {
         Ok(())
     }
 
-    pub fn file_size(path: String) -> Res<u32> {
+    fn file_size(path: String) -> Res<u32> {
         let client = Self::client()?;
 
         match client.get_file_info(&path) {
@@ -183,19 +214,83 @@ impl AfcFileManager {
         }
     }
 
-    // TODO: return directoryentrys to prevent creating a new client for every directory
-    pub fn contents_of(directory_path: String) -> Option<Vec<String>> {
-        let client = Self::client().ok()?;
-
-        match client.read_directory(&directory_path) {
-            Ok(c) => {
-                debug!("Got directory contents of {directory_path}");
-                Some(c)
-            }
-            Err(e) => {
-                error!("Couldn't get directory contents of {directory_path}: {e:?}");
-                None
+    pub fn contents() -> Vec<RustDirectoryEntry> {
+        fn file_info(client: &AfcClient, path: &str) -> (bool, Option<u32>) {
+            match client.get_file_info(path) {
+                Ok(i) => {
+                    debug!("Got file info for {path}");
+                    (
+                        match i.get("st_ifmt") {
+                            Some(s) => s == "S_IFDIR",
+                            None => {
+                                error!("Couldn't get file type for {path}");
+                                false
+                            }
+                        },
+                        i.get("st_size").map(|s| s.parse().unwrap()),
+                    )
+                }
+                Err(e) => {
+                    error!("Couldn't get file info for {path}: {e:?}");
+                    (false, None)
+                }
             }
         }
+
+        fn directory_contents(client: &AfcClient, directory_path: &str) -> Option<Vec<String>> {
+            match client.read_directory(directory_path) {
+                Ok(c) => {
+                    debug!("Got directory contents of {directory_path}");
+                    Some(c)
+                }
+                Err(e) => {
+                    error!("Couldn't get directory contents of {directory_path}: {e:?}");
+                    None
+                }
+            }
+        }
+
+        fn _contents(
+            client: &AfcClient,
+            directory_path: &str,
+            depth: u8,
+        ) -> Vec<RustDirectoryEntry> {
+            let mut entries = vec![];
+            if let Some(contents) = directory_contents(client, directory_path) {
+                for entry in contents {
+                    if entry == "." || entry == ".." {
+                        continue;
+                    }
+
+                    let path = format!("{directory_path}{entry}");
+                    let (is_directory, size) = file_info(client, &path);
+                    entries.push(RustDirectoryEntry {
+                        path: if is_directory {
+                            format!("{path}/")
+                        } else {
+                            path.clone()
+                        },
+                        parent: directory_path.to_owned(),
+                        is_file: !is_directory,
+                        size,
+                        // make sure it doesn't take a really long time to go through everything
+                        // TODO: only do this for some directories or exclude some directories
+                        children: if is_directory && depth < 3 {
+                            _contents(client, &path, depth + 1)
+                        } else {
+                            vec![]
+                        },
+                    });
+                }
+            }
+            entries
+        }
+
+        let client = match Self::client() {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
+
+        _contents(&client, "/", 0)
     }
 }

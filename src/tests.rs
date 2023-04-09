@@ -102,7 +102,8 @@ make_test!(jit_pid, {
 });
 
 make_test!(afc_file_manager, {
-    dbg!(AfcFileManager::contents_of("PublicStaging".to_string()).unwrap());
+    // warning: may take a while
+    dbg!(AfcFileManager::contents());
     dbg!(AfcFileManager::write_file(
         "/hello_apple".to_string(),
         std::fs::read("./README.md").unwrap().as_slice(),
