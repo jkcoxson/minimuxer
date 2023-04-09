@@ -63,7 +63,7 @@ mod ffi {
         ProfileRemove,
 
         /* signing */
-        AppleCodesign(String),
+        // AppleCodesign(String),
     }
 
     extern "Rust" {
