@@ -32,21 +32,33 @@ While minimuxer is built to run on device, it is recommended to test from your c
 [On device](#on-device) for more info)
 
 To test off device, open [tests.rs](src/tests.rs) and use the `make_test` macro to make a test (this ensures logging and other things are initialized). You can then use
+
 ```bash
 cargo test <test function name> -- --nocapture
 ```
+
 to run it. (`-- --nocapture` allows for logs to be shown, which are essential for debugging and knowing if a test did what it was supposed to do)
 
-After implementing your feature, you should also run 
+Since libimobiledevice logging can be quick verbose, you can filter it to only minimuxer logging with this command:
+
+```bash
+cargo test <test function name> -- --nocapture 2>&1 | grep -e minimuxer:: -e tests.rs
+```
+
+After implementing your feature, you should also run
+
 ```bash
 cargo clippy --no-deps
-``` 
-to lint your code. 
+```
 
-If you want some of the lints to auto fix, you can use 
+to lint your code.
+
+If you want some of the lints to auto fix, you can use
+
 ```bash
 cargo clippy --no-deps --fix
 ```
+
 (make sure to commit your changes beforehand).
 
 Note: tests currently don't automatically mount the developer disk image, you must do that yourself with `ideviceimagemounter` or open SideStore on device and let the auto mounter mount it (check
