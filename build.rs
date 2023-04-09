@@ -3,17 +3,17 @@ use std::{cmp::Ordering, path::PathBuf};
 fn main() {
     println!("cargo:rerun-if-changed=./build.rs");
 
-    let out_dir = "./generated/";
-    println!("cargo:rerun-if-changed={out_dir}minimuxer-helpers.swift");
-    let root = "./src/";
+    const OUT_DIR: &str = "./generated/";
+    println!("cargo:rerun-if-changed={OUT_DIR}minimuxer-helpers.swift");
+    const ROOT: &str = "./src/";
 
-    let mut bridges: Vec<PathBuf> = std::fs::read_dir(root)
+    let mut bridges: Vec<PathBuf> = std::fs::read_dir(ROOT)
         .unwrap()
         .map(|res| res.unwrap().path())
         .collect();
     for path in &bridges {
         let path = path.file_name().unwrap().to_str().unwrap().to_string();
-        println!("cargo:rerun-if-changed={root}{path}");
+        println!("cargo:rerun-if-changed={ROOT}{path}");
     }
     // Ensure we generate for lib.rs first
     bridges.sort_by(|a, b| {
@@ -27,10 +27,10 @@ fn main() {
     });
 
     swift_bridge_build::parse_bridges(bridges)
-        .write_all_concatenated(out_dir, env!("CARGO_PKG_NAME"));
+        .write_all_concatenated(OUT_DIR, env!("CARGO_PKG_NAME"));
 
     // move the generated headers/Swift out of the crate directory
-    let crate_dir = format!("{out_dir}{}", env!("CARGO_PKG_NAME"));
+    let crate_dir = format!("{OUT_DIR}{}", env!("CARGO_PKG_NAME"));
     for path in std::fs::read_dir(&crate_dir).unwrap() {
         let path = path
             .unwrap()
@@ -40,11 +40,11 @@ fn main() {
             .to_str()
             .unwrap()
             .to_string();
-        std::fs::rename(format!("{crate_dir}/{path}"), format!("{out_dir}{path}")).unwrap();
+        std::fs::rename(format!("{crate_dir}/{path}"), format!("{OUT_DIR}{path}")).unwrap();
     }
     std::fs::remove_dir(crate_dir).unwrap();
 
-    for path in std::fs::read_dir(out_dir).unwrap() {
+    for path in std::fs::read_dir(OUT_DIR).unwrap() {
         let path = path
             .unwrap()
             .path()
@@ -53,7 +53,7 @@ fn main() {
             .to_str()
             .unwrap()
             .to_string();
-        let out_path = format!("{out_dir}{path}");
+        let out_path = format!("{OUT_DIR}{path}");
 
         // remove duplicate lines from minimuxer.h (see https://github.com/chinedufn/swift-bridge/issues/207)
         if path.ends_with(&format!("{}.h", env!("CARGO_PKG_NAME"))) {
