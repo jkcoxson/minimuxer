@@ -136,7 +136,11 @@ pub fn install_ipa(bundle_id: String) -> Res<()> {
     info!("Installing");
     match inst_client.install(
         format!("./{PKG_PATH}/{bundle_id}/app.ipa"),
-        Some(Plist::from_rusty_plist(&Value::Dictionary(client_opts)).unwrap()),
+        Some(
+            Plist::from_rusty_plist(&Value::Dictionary(client_opts))
+                .unwrap()
+                .clone(), // clone fixes crash for some reason
+        ),
     ) {
         Ok(_) => {
             info!("Done!");
