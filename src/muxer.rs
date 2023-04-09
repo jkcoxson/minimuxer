@@ -280,8 +280,15 @@ pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
             LevelFilter::max(),
             // Allow logging from everywhere, to include rusty_libimobiledevice and any other useful debugging info
             ConfigBuilder::new()
-                .add_filter_ignore_str("plist_plus") // plist_plus spams logs
                 .set_target_level(LevelFilter::Error)
+                .add_filter_ignore_str("plist_plus") // plist_plus spams logs
+                // crates that spam logs when signing
+                .add_filter_ignore_str("goblin")
+                .add_filter_ignore_str("reqwest")
+                .add_filter_ignore_str("want")
+                .add_filter_ignore_str("mio")
+                .add_filter_ignore_str("hyper")
+                .add_filter_ignore_str("tracing")
                 .build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
