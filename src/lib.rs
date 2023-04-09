@@ -63,11 +63,17 @@ mod ffi {
     }
 
     extern "Rust" {
+        fn describe_error(error: Errors) -> String;
+
         fn ready() -> bool;
         fn set_debug(debug: bool);
     }
 }
 pub(crate) use ffi::Errors; // export transparent Errors enum for other modules to use
+
+pub fn describe_error(error: Errors) -> String {
+    format!("{error:?}")
+}
 
 /// utility Result to always use an Errors as Err type
 ///
@@ -110,6 +116,7 @@ extern "C" {
 
 /// Enables or disables libimobiledevice and libusbmuxd debug logging
 fn set_debug(debug: bool) {
+    info!("Setting debug logging to {debug}");
     let level = match debug {
         true => 1,
         false => 0,
