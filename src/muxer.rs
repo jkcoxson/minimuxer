@@ -209,7 +209,7 @@ fn handle_packet(
             Ok(output.into())
         }
         // DEVELOPER NOTE: if you are getting UnknownMessageType errors, the best way to implement a message type is to search for it (for example ReadBUID) in the libimobiledevice org: https://github.com/search?q=org%3Alibimobiledevice+ReadBUID&type=code
-        // Once you find how usbmuxd receives the message (or how libusbmuxd gives the message), you can reimplement it in this function.
+        // Once you find how usbmuxd sends the message (or how libusbmuxd receives the message), you can reimplement it in this function.
         _ => Err(HandlePacketError::UnknownMessageType),
     }
 }
