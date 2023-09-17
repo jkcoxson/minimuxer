@@ -1,18 +1,13 @@
 // Jackson Coxson
 
-use std::{
-    fs::File,
-    io::{Read, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddrV4, TcpListener},
-    str::FromStr,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::net::{IpAddr, Ipv4Addr, SocketAddrV4, TcpListener};
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use log::{error, info, trace, warn, LevelFilter};
+use log::{error, info, trace, warn};
 use plist::{Dictionary, Value};
-use simplelog::{
-    ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
-};
 
 use crate::{heartbeat::start_beat, plist_to_bytes, raw_packet::RawPacket, Errors};
 
@@ -265,6 +260,9 @@ pub static STARTED: AtomicBool = AtomicBool::new(true); // minimuxer won't start
 /// # Arguments
 /// Pairing file contents as a string and log path as a string
 pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
+    use fern::Dispatch;
+    use log::LevelFilter;
+
     let log_path = format!("{}/minimuxer.log", &log_path[7..]); // remove the file:// prefix
 
     if STARTED.load(Ordering::Relaxed) {
@@ -274,34 +272,40 @@ pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
     }
 
     // the logger failing to initialize isn't a problem since it will only fail if it has already been initialized
-    if CombinedLogger::init(vec![
-        TermLogger::new(
-            // Allow debug logging for terminal only
-            LevelFilter::max(),
-            // Allow logging from everywhere, to include rusty_libimobiledevice and any other useful debugging info
-            ConfigBuilder::new()
-                .set_target_level(LevelFilter::Error)
-                .add_filter_ignore_str("plist_plus") // plist_plus spams logs
+    if Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{}] {}: {}",
+                chrono::Local::now().format("%X"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .chain(
+            // stdout
+            Dispatch::new()
+                .level(LevelFilter::Trace)
+                .level_for("plist_plus", LevelFilter::Off) // plist_plus spams logs
                 // crates that spam logs when signing
-                .add_filter_ignore_str("goblin")
-                .add_filter_ignore_str("reqwest")
-                .add_filter_ignore_str("want")
-                .add_filter_ignore_str("mio")
-                .add_filter_ignore_str("hyper")
-                .add_filter_ignore_str("tracing")
-                .build(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Info,
-            ConfigBuilder::new()
-                .add_filter_allow("minimuxer".to_string())
-                .build(),
-            File::create(&log_path).unwrap(),
-        ),
-    ])
-    .is_ok()
+                .level_for("goblin", LevelFilter::Off)
+                .level_for("reqwest", LevelFilter::Off)
+                .level_for("want", LevelFilter::Off)
+                .level_for("mio", LevelFilter::Off)
+                .level_for("hyper", LevelFilter::Off)
+                .level_for("tracing", LevelFilter::Off) // maybe we shouldn't do this?
+                .chain(std::io::stdout()),
+        )
+        .chain(
+            // minimuxer.log
+            Dispatch::new()
+                .level(LevelFilter::Off)
+                .level_for("minimuxer", LevelFilter::Info)
+                .level_for("rusty_libimobiledevice", LevelFilter::Error)
+                .chain(File::create(&log_path).unwrap()),
+        )
+        .apply()
+        .is_ok()
     {
         info!("Logger initialized!!");
     }

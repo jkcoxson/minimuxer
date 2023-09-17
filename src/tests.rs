@@ -1,5 +1,4 @@
 use log::info;
-use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
 use std::io::{self, Write};
 use std::process::Command;
 use std::sync::Once;
@@ -20,18 +19,10 @@ fn init() {
     INIT.call_once(|| {
         set_debug(true);
 
-        TermLogger::init(
-            // Allow debug logging
-            LevelFilter::max(),
-            // Allow logging from everywhere, to include rusty_libimobiledevice and any other useful debugging info
-            ConfigBuilder::new()
-                .add_filter_ignore_str("plist_plus") // plist_plus spams logs
-                .set_target_level(LevelFilter::Error)
-                .build(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        )
-        .expect("logger failed to initialize");
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "trace")
+        }
+        env_logger::init();
 
         info!("Successfully initialized tests");
         println!();

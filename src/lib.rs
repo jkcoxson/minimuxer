@@ -54,7 +54,7 @@ mod ffi {
         /* install */
         CreateAfc,
         RwAfc,
-        InstallApp,
+        InstallApp(String),
         UninstallApp,
 
         /* provision */
