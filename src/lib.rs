@@ -157,9 +157,17 @@ pub(crate) trait PlistPlusConversion {
 impl PlistPlusConversion for Plist {
     fn from_rusty_plist(plist: &Value) -> Result<Plist, PlistError> {
         Plist::from_bin({
+            // We cannot use plist_to_bytes because it returns XML format while we want binary
             let mut bytes = Vec::new();
             plist::to_writer_binary(&mut bytes, plist).unwrap();
             bytes
         })
     }
+}
+
+/// Converts a rusty plist Value to bytes in XML format. Panics on failure (but it shouldn't fail, if it does it's most likely your fault)
+pub(crate) fn plist_to_bytes<P: Serialize>(plist: &P) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    plist::to_writer_xml(&mut bytes, plist).unwrap();
+    bytes
 }
