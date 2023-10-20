@@ -97,9 +97,9 @@ fn ready() -> bool {
     let dmg_mounted = DMG_MOUNTED.load(Ordering::Relaxed);
     let started = STARTED.load(Ordering::Relaxed);
 
-    if !device_connection || !device_exists || !heartbeat_success || !dmg_mounted || !started {
+    if !device_connection || !device_exists || !heartbeat_success || !started {
         info!(
-            "minimuxer is not ready. device connection succeeded: {}; at least 1 device exists: {}; last heartbeat was a success: {}; developer disk image is mounted: {}; started: {}",
+            "minimuxer is not ready. device connection succeeded: {}; at least 1 device exists: {}; last heartbeat was a success: {}; developer disk image is mounted (not counted): {}; started: {}",
             device_connection,
             device_exists,
             heartbeat_success,
