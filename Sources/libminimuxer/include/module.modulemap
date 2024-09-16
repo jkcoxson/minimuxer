@@ -1,0 +1,6 @@
+module libminimuxer {
+	header "../SwiftBridgeCore.h"
+	header "../minimuxer.h"
+
+	export *
+}
