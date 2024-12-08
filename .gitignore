@@ -9,3 +9,9 @@ Cargo.lock
 /generated/*
 !/generated/minimuxer-Bridging-Header.h
 !/generated/minimuxer-helpers.swift
+
+# generated sources
+*.a
+*.swift
+*.h
+module.modulemap*

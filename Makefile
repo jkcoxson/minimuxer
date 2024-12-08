@@ -6,29 +6,37 @@ add_targets:
 	@echo "add_targets"
 	rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
-build:
+compile:
 	@echo "build aarch64-apple-ios"
-	@cargo build --release --target aarch64-apple-ios
-	@cp target/aarch64-apple-ios/release/lib$(TARGET).a target/lib$(TARGET)-ios.a
+	@# @cargo build --release --target aarch64-apple-ios
+	@cargo build --target aarch64-apple-ios
+	@# @cp target/aarch64-apple-ios/release/lib$(TARGET).a target/lib$(TARGET)-ios.a
+	@cp target/aarch64-apple-ios/debug/lib$(TARGET).a target/lib$(TARGET)-ios.a
 
 ifeq ($(SKIP_SIM),false)
 	@echo "build aarch64-apple-ios-sim"
-	@cargo build --release --target aarch64-apple-ios-sim
+	@# @cargo build --release --target aarch64-apple-ios-sim
+	@cargo build --target aarch64-apple-ios-sim
 
 	@echo "build x86_64-apple-ios"
-	@cargo build --release --target x86_64-apple-ios
+	@# @cargo build --release --target x86_64-apple-ios
+	@cargo build --target x86_64-apple-ios
 
 	@echo "lipo"
+	@# @lipo -create \
+	@# 	-output target/lib$(TARGET)-sim.a \
+	@# 	target/aarch64-apple-ios-sim/release/lib$(TARGET).a \
+	@# 	target/x86_64-apple-ios/release/lib$(TARGET).a
 	@lipo -create \
 		-output target/lib$(TARGET)-sim.a \
-		target/aarch64-apple-ios-sim/release/lib$(TARGET).a \
-		target/x86_64-apple-ios/release/lib$(TARGET).a
+		target/aarch64-apple-ios-sim/debug/lib$(TARGET).a \
+		target/x86_64-apple-ios/debug/lib$(TARGET).a
 else
 	@echo "skipping sim builds"
 endif
 
 # TODO: remove/update once SPM gets merged
-copy: build
+copy:
 	@echo "SIDESTORE_REPO: $(SIDESTORE_REPO)"
 
 	@echo "copying libraries"
@@ -39,6 +47,8 @@ copy: build
 	@cp generated/* "$(SIDESTORE_REPO)/Dependencies/minimuxer"
 
 	@touch "$(SIDESTORE_REPO)/Dependencies/.skip-prebuilt-fetch-minimuxer"
+
+build: compile copy
 
 clean:
 	@echo "clean"
@@ -58,6 +68,8 @@ clean:
 		echo "cleaning $(TARGET).xcframework.zip"; \
         rm $(TARGET).xcframework.zip; \
     fi
+	@rm -f *.h *.swift
+	@rm -f *.a 
 
 xcframework: build
 	@echo "xcframework"
