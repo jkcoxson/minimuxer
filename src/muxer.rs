@@ -18,6 +18,7 @@ mod ffi {
 
     extern "Rust" {
         fn start(pairing_file: String, log_path: String) -> Result<(), Errors>;
+        fn startWithLogger(pairing_file: String, log_path: String, is_console_logging_enabled: bool) -> Result<(), Errors>;
         fn target_minimuxer_address();
     }
 }
@@ -257,9 +258,13 @@ pub static STARTED: AtomicBool = AtomicBool::new(false);
 pub static STARTED: AtomicBool = AtomicBool::new(true); // minimuxer won't start in tests
 
 /// Starts the muxer and heartbeat client
-/// # Arguments
+/// # Arguments\
 /// Pairing file contents as a string and log path as a string
 pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
+    startWithLogger(pairing_file, log_path, true)   // logging is enabled by default as before
+}
+
+pub fn startWithLogger(pairing_file: String, log_path: String, is_console_logging_enabled: bool) -> crate::Res<()> {
     use fern::Dispatch;
     use log::LevelFilter;
 
@@ -272,7 +277,7 @@ pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
     }
 
     // the logger failing to initialize isn't a problem since it will only fail if it has already been initialized
-    if Dispatch::new()
+    let mut logger = Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
                 "{} [{}] {}: {}",
@@ -281,9 +286,11 @@ pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
                 record.target(),
                 message
             ))
-        })
-        .chain(
-            // stdout
+    });
+
+    // conditionally enable stdout logging only if requested
+    if is_console_logging_enabled {
+        logger = logger.chain(
             Dispatch::new()
                 .level(LevelFilter::Trace)
                 .level_for("plist_plus", LevelFilter::Off) // plist_plus spams logs
@@ -295,17 +302,20 @@ pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
                 .level_for("hyper", LevelFilter::Off)
                 .level_for("tracing", LevelFilter::Off) // maybe we shouldn't do this?
                 .chain(std::io::stdout()),
-        )
-        .chain(
-            // minimuxer.log
-            Dispatch::new()
-                .level(LevelFilter::Off)
-                .level_for("minimuxer", LevelFilter::Info)
-                .level_for("rusty_libimobiledevice", LevelFilter::Error)
-                .chain(File::create(&log_path).unwrap()),
-        )
-        .apply()
-        .is_ok()
+        );
+    }
+
+    logger = logger.chain(
+        // minimuxer.log
+        Dispatch::new()
+            .level(LevelFilter::Off)
+            .level_for("minimuxer", LevelFilter::Info)
+            .level_for("rusty_libimobiledevice", LevelFilter::Error)
+            .chain(File::create(&log_path).unwrap()),
+    );
+
+    // apply logger
+    if logger.apply().is_ok()
     {
         info!("Logger initialized!!");
     }
