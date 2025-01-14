@@ -258,7 +258,7 @@ pub static STARTED: AtomicBool = AtomicBool::new(false);
 pub static STARTED: AtomicBool = AtomicBool::new(true); // minimuxer won't start in tests
 
 /// Starts the muxer and heartbeat client
-/// # Arguments\
+/// # Arguments
 /// Pairing file contents as a string and log path as a string
 pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
     startWithLogger(pairing_file, log_path, true)   // logging is enabled by default as before

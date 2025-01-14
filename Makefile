@@ -1,4 +1,5 @@
-SIDESTORE_REPO ?= ../SideStore
+SIDESTORE_REPO ?= ../../../SideStore
+# SIDESTORE_REPO ?= ../SideStore
 SKIP_SIM ?= false
 TARGET="minimuxer"
 
@@ -40,15 +41,16 @@ copy:
 	@echo "SIDESTORE_REPO: $(SIDESTORE_REPO)"
 
 	@echo "copying libraries"
-	@cp target/libminimuxer-ios.a "$(SIDESTORE_REPO)/Dependencies/minimuxer"
-	@cp target/libminimuxer-sim.a "$(SIDESTORE_REPO)/Dependencies/minimuxer"
+	@cp target/libminimuxer-ios.a "$(SIDESTORE_REPO)/SideStore/minimuxer"
+	@cp target/libminimuxer-sim.a "$(SIDESTORE_REPO)/SideStore/minimuxer"
 
 	@echo "copying generated"
-	@cp generated/* "$(SIDESTORE_REPO)/Dependencies/minimuxer"
+	@cp generated/* "$(SIDESTORE_REPO)/SideStore/minimuxer"
 
-	@touch "$(SIDESTORE_REPO)/Dependencies/.skip-prebuilt-fetch-minimuxer"
+	@touch "$(SIDESTORE_REPO)/SideStore/.skip-prebuilt-fetch-minimuxer"
 
-build: compile copy
+# build: compile copy
+build: compile
 
 clean:
 	@echo "clean"
