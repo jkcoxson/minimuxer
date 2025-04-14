@@ -1,9 +1,10 @@
 // Jackson Coxson
 
-use idevice::{lockdown::LockdownClient, mobile_image_mounter::ImageMounter, provider::IdeviceProvider, usbmuxd::UsbmuxdConnection, IdeviceService};
+
+use idevice::{lockdown::LockdownClient, mobile_image_mounter::ImageMounter, provider::{IdeviceProvider, TcpProvider}, usbmuxd::UsbmuxdConnection, IdeviceService};
 use log::{debug, error, info};
 use std::{
-    io::Write, net::SocketAddrV4, path::{Path, PathBuf}, str::FromStr, sync::atomic::{AtomicBool, Ordering}
+    io::Write, net::{Ipv4Addr, SocketAddrV4}, path::{Path, PathBuf}, str::FromStr, sync::atomic::{AtomicBool, Ordering}
 };
 use tokio::io::AsyncWriteExt;
 
@@ -316,22 +317,24 @@ pub fn start_auto_mounter(docs_path: String) {
                             ),
                             0,
                         );
-                        let provider = match uc
+                        let dev = match uc
                             .get_devices()
                             .await
                             .ok()
                             .and_then(|x| x.into_iter().next())
                         {
-                            Some(d) => d.to_provider(
-                                idevice::usbmuxd::UsbmuxdAddr::TcpSocket(std::net::SocketAddr::V4(
-                                    SocketAddrV4::from_str("127.0.0.1:27015").unwrap(),
-                                )),
-                                0,
-                                "minimuxer".to_string(),
-                            ),
+                            Some(d) => d.to_provider(idevice::usbmuxd::UsbmuxdAddr::TcpSocket(std::net::SocketAddr::V4(
+                        SocketAddrV4::from_str("127.0.0.1:27015").unwrap(),
+                    )), 0, "asdf"),
                             None => {
                                 return Err(Errors::NoConnection);
                             }
+                        };
+
+                        let provider = TcpProvider {
+                            addr: std::net::IpAddr::V4(Ipv4Addr::from_str("10.7.0.1").unwrap()),
+                            pairing_file: dev.get_pairing_file().await.unwrap(),
+                            label: "minimuxer".to_string(),
                         };
                         let mut lockdown_client = match LockdownClient::connect(&provider)
                             .await {

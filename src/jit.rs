@@ -1,9 +1,16 @@
 // Jackson Coxson
 
-use std::{net::SocketAddrV4, str::FromStr};
+
+use std::{
+    net::{Ipv4Addr, SocketAddrV4},
+    str::FromStr,
+};
 
 use idevice::{
-    core_device_proxy::CoreDeviceProxy, debug_proxy::DebugProxyClient, usbmuxd::UsbmuxdConnection,
+    core_device_proxy::CoreDeviceProxy,
+    debug_proxy::DebugProxyClient,
+    provider::{IdeviceProvider, TcpProvider},
+    usbmuxd::UsbmuxdConnection,
     IdeviceService,
 };
 use log::{debug, error, info};
@@ -185,7 +192,7 @@ pub fn debug_app(app_id: String) -> Res<()> {
                 ),
                 0,
             );
-            let provider = match uc
+            let dev = match uc
                 .get_devices()
                 .await
                 .ok()
@@ -196,17 +203,23 @@ pub fn debug_app(app_id: String) -> Res<()> {
                         SocketAddrV4::from_str("127.0.0.1:27015").unwrap(),
                     )),
                     0,
-                    "minimuxer".to_string(),
+                    "asdf",
                 ),
                 None => {
                     return Err(Errors::NoConnection);
                 }
             };
 
+            let provider = TcpProvider {
+                addr: std::net::IpAddr::V4(Ipv4Addr::from_str("10.7.0.1").unwrap()),
+                pairing_file: dev.get_pairing_file().await.unwrap(),
+                label: "minimuxer".to_string(),
+            };
+
             let proxy = match CoreDeviceProxy::connect(&provider).await {
                 Ok(p) => p,
                 Err(e) => {
-                    info!("Failed to proxy device: {:?}", e);
+                    println!("Failed to proxy device: {:?}", e);
                     return Err(Errors::CreateCoreDevice);
                 }
             };
@@ -215,13 +228,13 @@ pub fn debug_app(app_id: String) -> Res<()> {
             let mut adapter = match proxy.create_software_tunnel() {
                 Ok(a) => a,
                 Err(e) => {
-                    info!("Failed to create software tunnel: {:?}", e);
+                    error!("Failed to create software tunnel: {:?}", e);
                     return Err(Errors::CreateSoftwareTunnel);
                 }
             };
 
             if let Err(e) = adapter.connect(rsd_port).await {
-                info!("Failed to connect to RemoteXPC port: {:?}", e);
+                error!("Failed to connect to RemoteXPC port: {:?}", e);
                 return Err(Errors::Connect);
             }
 

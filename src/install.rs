@@ -1,5 +1,6 @@
 // Jackson Coxson
 
+
 use log::{error, info};
 use plist::{Dictionary, Value};
 use plist_plus::Plist;
@@ -149,7 +150,7 @@ pub fn install_ipa(bundle_id: String) -> Res<()> {
         Err(e) => {
             // rusty_libimobiledevice will log an error that's better
             // error!("Unable to install app: {:?}: {}", err, description);
-            Err(Errors::InstallApp(e.to_string()))
+            Err(Errors::InstallApp(e.1))
         }
     }
 }
