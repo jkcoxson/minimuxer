@@ -146,10 +146,10 @@ pub fn install_ipa(bundle_id: String) -> Res<()> {
             info!("Done!");
             Ok(())
         }
-        Err((_err, description)) => {
+        Err(e) => {
             // rusty_libimobiledevice will log an error that's better
             // error!("Unable to install app: {:?}: {}", err, description);
-            Err(Errors::InstallApp(description))
+            Err(Errors::InstallApp(e.to_string()))
         }
     }
 }

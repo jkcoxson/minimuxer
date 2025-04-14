@@ -3,10 +3,12 @@
 use std::{io::Cursor, sync::atomic::Ordering};
 
 use log::info;
+use once_cell::sync::Lazy;
 use plist::{Error, Value};
 use plist_plus::error::PlistError;
 use plist_plus::Plist;
 use serde::Serialize;
+use tokio::runtime::{self, Runtime};
 
 use crate::device::{fetch_first_device, test_device_connection};
 use crate::heartbeat::LAST_BEAT_SUCCESSFUL;
@@ -25,6 +27,14 @@ mod raw_packet;
 #[cfg(test)]
 mod tests;
 
+static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    runtime::Builder::new_multi_thread()
+        .enable_io()
+        .enable_time()
+        .build()
+        .unwrap()
+});
+
 #[swift_bridge::bridge]
 mod ffi {
     // TODO: give arguments to most errors with exact error message as string (for example, ApplicationVerificationFailed as String passed to InstallApp)
@@ -38,8 +48,19 @@ mod ffi {
 
         CreateDebug,
         CreateInstproxy,
+        CreateLockdown,
+        CreateCoreDevice,
+        CreateSoftwareTunnel,
+        CreateRemoteServer,
+        CreateProcessControl,
 
         /* jit */
+        GetLockdownValue,
+        Connect,
+        Close,
+        XpcHandshake,
+        NoService,
+        InvalidProductVersion,
         LookupApps,
         FindApp,
         BundlePath,
