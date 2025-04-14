@@ -18,7 +18,11 @@ mod ffi {
 
     extern "Rust" {
         fn start(pairing_file: String, log_path: String) -> Result<(), Errors>;
-        fn startWithLogger(pairing_file: String, log_path: String, is_console_logging_enabled: bool) -> Result<(), Errors>;
+        fn startWithLogger(
+            pairing_file: String,
+            log_path: String,
+            is_console_logging_enabled: bool,
+        ) -> Result<(), Errors>;
         fn target_minimuxer_address();
     }
 }
@@ -261,10 +265,14 @@ pub static STARTED: AtomicBool = AtomicBool::new(true); // minimuxer won't start
 /// # Arguments
 /// Pairing file contents as a string and log path as a string
 pub fn start(pairing_file: String, log_path: String) -> crate::Res<()> {
-    startWithLogger(pairing_file, log_path, true)   // logging is enabled by default as before
+    startWithLogger(pairing_file, log_path, true) // logging is enabled by default as before
 }
 
-pub fn startWithLogger(pairing_file: String, log_path: String, is_console_logging_enabled: bool) -> crate::Res<()> {
+pub fn startWithLogger(
+    pairing_file: String,
+    log_path: String,
+    is_console_logging_enabled: bool,
+) -> crate::Res<()> {
     use fern::Dispatch;
     use log::LevelFilter;
 
@@ -277,15 +285,14 @@ pub fn startWithLogger(pairing_file: String, log_path: String, is_console_loggin
     }
 
     // the logger failing to initialize isn't a problem since it will only fail if it has already been initialized
-    let mut logger = Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} [{}] {}: {}",
-                chrono::Local::now().format("%X"),
-                record.level(),
-                record.target(),
-                message
-            ))
+    let mut logger = Dispatch::new().format(|out, message, record| {
+        out.finish(format_args!(
+            "{} [{}] {}: {}",
+            chrono::Local::now().format("%X"),
+            record.level(),
+            record.target(),
+            message
+        ))
     });
 
     // conditionally enable stdout logging only if requested
@@ -315,8 +322,7 @@ pub fn startWithLogger(pairing_file: String, log_path: String, is_console_loggin
     );
 
     // apply logger
-    if logger.apply().is_ok()
-    {
+    if logger.apply().is_ok() {
         info!("Logger initialized!!");
     }
 

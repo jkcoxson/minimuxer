@@ -22,7 +22,6 @@ mod mounter;
 mod muxer;
 mod provision;
 mod raw_packet;
-mod signing;
 #[cfg(test)]
 mod tests;
 
@@ -61,7 +60,6 @@ mod ffi {
         CreateMisagent,
         ProfileInstall,
         ProfileRemove,
-
         /* signing */
         // AppleCodesign(String),
     }
