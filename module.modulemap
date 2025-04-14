@@ -1,0 +1,8 @@
+module minimuxer {
+	header "minimuxer-Bridging-Header.h"
+
+	// header "SwiftBridgeCore.h"
+	// header "minimuxer.h"
+
+	export *
+}

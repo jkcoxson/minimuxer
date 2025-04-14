@@ -1,53 +1,49 @@
 // Jackson Coxson
 
-use libc::c_int;
-use log::{error, info, trace};
+use log::{debug, error, info};
 use plist_plus::Plist;
 use rusty_libimobiledevice::services::instproxy::InstProxyClient;
 
-use crate::{errors::Errors, fetch_first_device, test_device_connection};
+use crate::{
+    device::{fetch_first_device, test_device_connection},
+    Errors, Res,
+};
 
-#[no_mangle]
+#[swift_bridge::bridge]
+mod ffi {
+    #[swift_bridge(already_declared, swift_name = "MinimuxerError")]
+    enum Errors {}
+
+    extern "Rust" {
+        fn debug_app(app_id: String) -> Result<(), Errors>;
+        fn attach_debugger(pid: u32) -> Result<(), Errors>;
+    }
+}
+
 /// Debugs an app from an app ID
-/// # Safety
-/// Don't be stupid
-pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int {
-    if app_id.is_null() {
-        return Errors::FunctionArgs.into();
-    }
-
-    let c_str = std::ffi::CStr::from_ptr(app_id);
-
-    let app_id = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return Errors::FunctionArgs.into(),
-    }
-    .to_string();
+pub fn debug_app(app_id: String) -> Res<()> {
+    info!("Debugging app ID: {}", app_id);
 
     if !test_device_connection() {
-        return Errors::NoConnection.into();
+        error!("No device connection");
+        return Err(Errors::NoConnection);
     }
 
-    trace!("Getting device from muxer");
-    let device = match fetch_first_device(Some(5000)) {
-        Ok(d) => d,
-        Err(_) => return Errors::NoDevice.into(),
-    };
+    let device = fetch_first_device()?;
 
-    trace!("Creating debug server");
     let debug_server = match device.new_debug_server("minimuxer") {
         Ok(d) => d,
-        Err(_) => {
-            error!("Failed to start debug server!");
-            return Errors::CreateDebug.into();
+        Err(e) => {
+            error!("Failed to start debug server: {:?}", e);
+            return Err(Errors::CreateDebug);
         }
     };
 
     let instproxy_client = match device.new_instproxy_client("minimuxer") {
         Ok(i) => i,
-        Err(_) => {
-            error!("Failed to create instproxy client!");
-            return Errors::CreateInstproxy.into();
+        Err(e) => {
+            error!("Failed to create instproxy client: {:?}", e);
+            return Err(Errors::CreateInstproxy);
         }
     };
 
@@ -61,61 +57,58 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
             "Container".to_string(),
         ],
     );
+
     let lookup_results = match instproxy_client.lookup(vec![app_id.clone()], Some(client_opts)) {
         Ok(apps) => {
-            trace!("Successfully looked up apps: {:?}", apps);
+            debug!("Successfully looked up apps: {:?}", apps);
             apps
         }
         Err(e) => {
             error!("Error looking up apps: {:?}", e);
-            return Errors::LookupApps.into();
+            return Err(Errors::LookupApps);
         }
     };
     let lookup_results = lookup_results.dict_get_item(&app_id).unwrap();
 
     let working_directory = match lookup_results.dict_get_item("Container") {
         Ok(p) => p,
-        Err(_) => {
-            error!("App not found");
-            return Errors::FindApp.into();
+        Err(e) => {
+            error!("App not found: {:?}", e);
+            return Err(Errors::FindApp);
         }
     };
 
     let working_directory = match working_directory.get_string_val() {
         Ok(p) => p,
-        Err(_) => {
-            error!("App not found");
-            return Errors::FindApp.into();
+        Err(e) => {
+            error!("Error when getting string val: {:?}", e);
+            return Err(Errors::FindApp);
         }
     };
-    trace!("Working directory: {}", working_directory);
+    debug!("Working directory: {}", working_directory);
 
     let bundle_path = match instproxy_client.get_path_for_bundle_identifier(app_id) {
-        Ok(p) => {
-            info!("Successfully found bundle path");
-            p
-        }
+        Ok(p) => p,
         Err(e) => {
             error!("Error getting path for bundle identifier: {:?}", e);
-            return Errors::BundlePath.into();
+            return Err(Errors::BundlePath);
         }
     };
-
-    info!("Bundle Path: {}", bundle_path);
+    info!("Successfully found bundle path: {bundle_path}");
 
     match debug_server.send_command("QSetMaxPacketSize: 1024".into()) {
         Ok(res) => info!("Successfully set max packet size: {:?}", res),
         Err(e) => {
             error!("Error setting max packet size: {:?}", e);
-            return Errors::MaxPacket.into();
+            return Err(Errors::MaxPacket);
         }
     }
 
-    match debug_server.send_command(format!("QSetWorkingDir: {}", working_directory).into()) {
+    match debug_server.send_command(format!("QSetWorkingDir: {working_directory}").into()) {
         Ok(res) => info!("Successfully set working directory: {:?}", res),
         Err(e) => {
             error!("Error setting working directory: {:?}", e);
-            return Errors::WorkingDirectory.into();
+            return Err(Errors::WorkingDirectory);
         }
     }
 
@@ -123,7 +116,7 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
         Ok(res) => info!("Successfully set argv: {:?}", res),
         Err(e) => {
             error!("Error setting argv: {:?}", e);
-            return Errors::Argv.into();
+            return Err(Errors::Argv);
         }
     }
 
@@ -131,17 +124,72 @@ pub unsafe extern "C" fn minimuxer_debug_app(app_id: *mut libc::c_char) -> c_int
         Ok(res) => info!("Got launch response: {:?}", res),
         Err(e) => {
             error!("Error checking if app launched: {:?}", e);
-            return Errors::LaunchSuccess.into();
+            return Err(Errors::LaunchSuccess);
         }
     }
 
     match debug_server.send_command("D".into()) {
-        Ok(res) => info!("Detaching: {:?}", res),
+        Ok(res) => {
+            info!("Success: {:?}", res);
+            Ok(())
+        }
         Err(e) => {
             error!("Error detaching: {:?}", e);
-            return Errors::Detach.into();
+            Err(Errors::Detach)
+        }
+    }
+}
+
+/// Debugs an app from a process ID
+/// # Arguments
+/// - `pid`: Process ID. `attach_debugger` will automatically turn this into the format required by DebugServer.
+pub fn attach_debugger(pid: u32) -> Res<()> {
+    info!("Debugging process ID: {}", pid);
+
+    if !test_device_connection() {
+        error!("No device connection");
+        return Err(Errors::NoConnection);
+    }
+
+    let device = fetch_first_device()?;
+
+    let debug_server = match device.new_debug_server("minimuxer") {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Failed to start debug server: {:?}", e);
+            return Err(Errors::CreateDebug);
+        }
+    };
+
+    // Taken from JitStreamer: https://github.com/jkcoxson/JitStreamer/blob/master/src/client.rs#L338-L363
+
+    let command = "vAttach;";
+
+    // The PID will consist of 8 hex digits, so we need to pad it with 0s
+    let pid = format!("{pid:X}");
+    println!("{pid}");
+    let zeroes = 8 - pid.len();
+    let pid = format!("{}{}", "0".repeat(zeroes), pid);
+    let command = format!("{command}{pid}");
+    info!("Sending command: {}", command);
+
+    match debug_server.send_command(command.into()) {
+        Ok(res) => info!("Successfully attached: {:?}", res),
+        Err(e) => {
+            error!("Error attaching: {:?}", e);
+            return Err(Errors::Attach);
         }
     }
 
-    Errors::Success.into()
+    match debug_server.send_command("D".into()) {
+        Ok(res) => {
+            info!("Success: {:?}", res);
+            Ok(())
+        }
+        Err(e) => {
+            error!("Error detaching: {:?}", e);
+            Err(Errors::Detach)
+        }
+    }
 }
+

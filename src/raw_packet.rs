@@ -1,7 +1,9 @@
 // jkcoxson
 
 use log::warn;
-use plist_plus::Plist;
+use plist::Value;
+
+use crate::plist_to_bytes;
 
 #[derive(Debug)]
 pub struct RawPacket {
@@ -9,14 +11,12 @@ pub struct RawPacket {
     pub version: u32,
     pub message: u32,
     pub tag: u32,
-    pub plist: Plist,
+    pub plist: Value,
 }
 
 impl RawPacket {
-    pub fn new(plist: Plist, version: u32, message: u32, tag: u32) -> RawPacket {
-        let plist_bytes = plist.to_string();
-        let plist_bytes = plist_bytes.as_bytes();
-        let size = plist_bytes.len() as u32 + 16;
+    pub fn new(plist: Value, version: u32, message: u32, tag: u32) -> RawPacket {
+        let size = plist_to_bytes(&plist).len() as u32 + 16;
         RawPacket {
             size,
             version,
@@ -34,7 +34,7 @@ impl From<RawPacket> for Vec<u8> {
         packet.extend_from_slice(&raw_packet.version.to_le_bytes());
         packet.extend_from_slice(&raw_packet.message.to_le_bytes());
         packet.extend_from_slice(&raw_packet.tag.to_le_bytes());
-        packet.extend_from_slice(raw_packet.plist.to_string().as_bytes());
+        packet.extend_from_slice(plist_to_bytes(&raw_packet.plist).as_slice());
         packet
     }
 }
@@ -49,7 +49,7 @@ impl TryFrom<&mut Vec<u8>> for RawPacket {
 
 impl TryFrom<&[u8]> for RawPacket {
     type Error = ();
-    fn try_from(packet: &[u8]) -> Result<Self, ()> {
+    fn try_from(packet: &[u8]) -> Result<Self, Self::Error> {
         // Determine if we have enough data to parse
         if packet.len() < 16 {
             warn!("Not enough data to parse a raw packet header");
@@ -59,8 +59,8 @@ impl TryFrom<&[u8]> for RawPacket {
         let packet_size = &packet[0..4];
         let packet_size = u32::from_le_bytes(match packet_size.try_into() {
             Ok(packet_size) => packet_size,
-            Err(_) => {
-                warn!("Failed to parse packet size");
+            Err(e) => {
+                warn!("Failed to parse packet size: {e:?}");
                 return Err(());
             }
         });
@@ -74,8 +74,8 @@ impl TryFrom<&[u8]> for RawPacket {
         let packet_version = &packet[4..8];
         let packet_version = u32::from_le_bytes(match packet_version.try_into() {
             Ok(packet_version) => packet_version,
-            Err(_) => {
-                warn!("Failed to parse packet version");
+            Err(e) => {
+                warn!("Failed to parse packet version: {e:?}");
                 return Err(());
             }
         });
@@ -83,8 +83,8 @@ impl TryFrom<&[u8]> for RawPacket {
         let message = &packet[8..12];
         let message = u32::from_le_bytes(match message.try_into() {
             Ok(message) => message,
-            Err(_) => {
-                warn!("Failed to parse packet message");
+            Err(e) => {
+                warn!("Failed to parse packet message: {e:?}");
                 return Err(());
             }
         });
@@ -92,18 +92,19 @@ impl TryFrom<&[u8]> for RawPacket {
         let packet_tag = &packet[12..16];
         let packet_tag = u32::from_le_bytes(match packet_tag.try_into() {
             Ok(packet_tag) => packet_tag,
-            Err(_) => {
-                warn!("Failed to parse packet tag");
+            Err(e) => {
+                warn!("Failed to parse packet tag: {e:?}");
                 return Err(());
             }
         });
 
         let plist = &packet[16..packet_size as usize];
-        let plist = if let Ok(p) = Plist::from_xml(String::from_utf8_lossy(plist).to_string()) {
-            p
-        } else {
-            warn!("Failed to parse packet plist");
-            return Err(());
+        let plist: Value = match plist::from_bytes(plist) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("Failed to parse packet plist: {e:?}");
+                return Err(());
+            }
         };
 
         Ok(RawPacket {
