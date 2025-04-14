@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rusty_libimobiledevice = { version = "0.2.3", features = [
-  "static",
-  "vendored",
-] }
+rusty_libimobiledevice = { git = "https://github.com/SideStore/rusty_libimobiledevice", features = [
+  "dynamic",
+], default-features = false }
 
 idevice = { version = "0.1.29", features = ["full"] }
 
