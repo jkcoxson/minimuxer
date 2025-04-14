@@ -81,8 +81,13 @@ mod ffi {
         CreateMisagent,
         ProfileInstall,
         ProfileRemove,
-        /* signing */
-        // AppleCodesign(String),
+
+        /* mount */
+        CreateFolder,
+        DownloadImage,
+        ImageLookup,
+        ImageRead,
+        Mount,
     }
 
     extern "Rust" {
