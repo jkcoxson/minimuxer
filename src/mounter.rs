@@ -23,9 +23,9 @@ mod ffi {
 const VERSIONS_DICTIONARY: &str =
     "https://raw.githubusercontent.com/jkcoxson/JitStreamer/master/versions.json";
 
-const DDI_URL: &str = "https://github.com/doronz88/DeveloperDiskImage/raw/refs/heads/main/PersonalizedImages/Xcode_iOS_DDI_Personalized/Image.dmg";
-const TRUSTCACHE_URL: &str = "https://github.com/doronz88/DeveloperDiskImage/raw/refs/heads/main/PersonalizedImages/Xcode_iOS_DDI_Personalized/Image.dmg.trustcache";
-const MANIFEST_URL: &str = "https://github.com/doronz88/DeveloperDiskImage/blob/main/PersonalizedImages/Xcode_iOS_DDI_Personalized/BuildManifest.plist";
+const DDI_URL: &str = "https://raw.githubusercontent.com/doronz88/DeveloperDiskImage/refs/heads/main/PersonalizedImages/Xcode_iOS_DDI_Personalized/Image.dmg";
+const TRUSTCACHE_URL: &str = "https://raw.githubusercontent.com/doronz88/DeveloperDiskImage/refs/heads/main/PersonalizedImages/Xcode_iOS_DDI_Personalized/Image.dmg.trustcache";
+const MANIFEST_URL: &str = "https://raw.githubusercontent.com/doronz88/DeveloperDiskImage/refs/heads/main/PersonalizedImages/Xcode_iOS_DDI_Personalized/BuildManifest.plist";
 
 pub static DMG_MOUNTED: AtomicBool = AtomicBool::new(false);
 
