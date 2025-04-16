@@ -318,6 +318,7 @@ pub fn startWithLogger(
             .level(LevelFilter::Off)
             .level_for("minimuxer", LevelFilter::Info)
             .level_for("rusty_libimobiledevice", LevelFilter::Error)
+            .level_for("idevice", LevelFilter::Debug)
             .chain(File::create(&log_path).unwrap()),
     );
 

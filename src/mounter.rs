@@ -306,6 +306,8 @@ pub fn start_auto_mounter(docs_path: String) {
                             }
                         }
 
+                        info!("Files downloaded, getting device from muxer");
+
                         let mut uc = UsbmuxdConnection::new(
                             Box::new(
                                 match tokio::net::TcpStream::connect("127.0.0.1:27015").await {
@@ -317,6 +319,7 @@ pub fn start_auto_mounter(docs_path: String) {
                             ),
                             0,
                         );
+
                         let dev = match uc
                             .get_devices()
                             .await
@@ -331,11 +334,14 @@ pub fn start_auto_mounter(docs_path: String) {
                             }
                         };
 
+                        info!("Creating provider from usbmuxd device");
                         let provider = TcpProvider {
                             addr: std::net::IpAddr::V4(Ipv4Addr::from_str("10.7.0.1").unwrap()),
                             pairing_file: dev.get_pairing_file().await.unwrap(),
                             label: "minimuxer".to_string(),
                         };
+
+                        info!("Connecting to lockdown for UCID");
                         let mut lockdown_client = match LockdownClient::connect(&provider)
                             .await {
                             Ok(l) => l,
@@ -344,6 +350,8 @@ pub fn start_auto_mounter(docs_path: String) {
                                 return Err(Errors::CreateLockdown);
                             }
                         };
+
+                        info!("Fetching UCID");
                         let unique_chip_id = match match lockdown_client.get_value("UniqueChipID").await {
                             Ok(u) => u,
                             Err(_) => {
@@ -372,11 +380,12 @@ pub fn start_auto_mounter(docs_path: String) {
                             }
                         };
 
-
+                        info!("Connecting to image mounter");
                         let mut mounter_client = ImageMounter::connect(&provider)
                             .await
                             .expect("Unable to connect to image mounter");
 
+                        info!("Copying devices from image mounter");
                         let images = match mounter_client
                             .copy_devices()
                             .await {
@@ -388,10 +397,11 @@ pub fn start_auto_mounter(docs_path: String) {
                         };
 
                         if !images.is_empty() {
-                            // done
+                            info!("Already mounted");
                             return Ok(())
                         }
 
+                        info!("Reading DDI files to memory");
                         let image_dmg = match tokio::fs::read(dir.join("Image.dmg")).await {
                             Ok(i) => i,
                             Err(e) => {
@@ -414,6 +424,7 @@ pub fn start_auto_mounter(docs_path: String) {
                             }
                         };
 
+                        info!("Mounting DDI...");
                         if let Err(e) = mounter_client
                             .mount_personalized_with_callback(
                                 &provider,
